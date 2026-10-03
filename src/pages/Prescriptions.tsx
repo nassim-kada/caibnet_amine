@@ -15,7 +15,7 @@ export const Prescriptions = () => {
   const [doctorId, setDoctorId] = useState('Dr. Ziani'); // Default mock doctor
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [diagnosis, setDiagnosis] = useState('');
-  const [treatments, setTreatments] = useState([{ act: '', sessionsCount: 10, notes: '' }]);
+  const [treatments, setTreatments] = useState([{ act: '', sessionsCount: '' as string | number, notes: '' }]);
   const [observations, setObservations] = useState('');
 
   const selectedPatient = patients.find((p: any) => p.id === selectedPatientId);
@@ -35,7 +35,7 @@ export const Prescriptions = () => {
   };
 
   const addTreatment = () => {
-    setTreatments([...treatments, { act: '', sessionsCount: 10, notes: '' }]);
+    setTreatments([{ act: '', sessionsCount: '', notes: '' }, ...treatments]);
   };
 
   const updateTreatment = (index: number, field: string, value: string | number) => {
@@ -65,7 +65,7 @@ export const Prescriptions = () => {
       filename:     `Ordonnance_${selectedPatient ? selectedPatient.lastName : 'Nouveau'}.pdf`,
       image:        { type: 'jpeg' as const, quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
     
     html2pdf().set(opt).from(element).save();
@@ -138,8 +138,8 @@ export const Prescriptions = () => {
                         <Input 
                           type="number"
                           placeholder="Nb séances" 
-                          value={t.sessionsCount}
-                          onChange={(e) => updateTreatment(idx, 'sessionsCount', parseInt(e.target.value) || 0)}
+                          value={String(t.sessionsCount)}
+                          onChange={(e) => updateTreatment(idx, 'sessionsCount', e.target.value ? parseInt(e.target.value) : '')}
                           style={{ flex: 1 }}
                         />
                       </div>

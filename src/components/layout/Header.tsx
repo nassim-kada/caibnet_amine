@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect } from 'react';
+import {useState, useRef, useEffect } from 'react';
 import { Menu, Search, Calendar, LogOut, User, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';

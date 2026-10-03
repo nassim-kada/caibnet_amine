@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Users, CheckCircle, Activity, TrendingUp } from 'lucide-react';
 import clsx from 'clsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';

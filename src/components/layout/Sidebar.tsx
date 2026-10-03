@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { LayoutDashboard, Users, Activity, FileText } from 'lucide-react';

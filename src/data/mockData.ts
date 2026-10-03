@@ -1,4 +1,4 @@
-import type { Patient, Injury, Session, Payment, Prescription } from '../types';
+import type { Patient, Injury, Session, Payment } from '../types';
 
 export const mockInjuries: Injury[] = [];
 export const mockPatients: Patient[] = [];
