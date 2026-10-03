@@ -1,0 +1,47 @@
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.th {
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-hover);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.td {
+  padding: 1rem 1.25rem;
+  color: var(--color-text-main);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+/* For tabular figures (aligning numbers well) */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.tr {
+  transition: background-color var(--transition-fast);
+}
+
+.tr:last-child .td {
+  border-bottom: none;
+}
+
+.tr:hover {
+  background-color: rgba(244, 248, 250, 0.5); /* subtle hover */
+}

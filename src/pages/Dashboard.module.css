@@ -1,0 +1,224 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.statIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.statIcon.primary {
+  background-color: rgba(11, 42, 91, 0.1);
+  color: var(--color-primary);
+}
+
+.statIcon.accent {
+  background-color: rgba(19, 124, 139, 0.1);
+  color: var(--color-accent);
+}
+
+.statIcon.success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statIcon.secondary {
+  background-color: rgba(227, 179, 65, 0.15);
+  color: var(--color-secondary);
+}
+
+.statInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.statValue {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chartPlaceholder {
+  width: 100%;
+  height: 250px;
+  background-color: var(--color-bg);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+}
+
+/* Quick implementation of a pure CSS bar chart */
+.barChart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 220px;
+  width: 100%;
+  padding-top: 20px;
+  gap: 10px;
+}
+
+.barCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.bar {
+  width: 100%;
+  max-width: 40px;
+  background-color: var(--color-accent);
+  border-radius: 4px 4px 0 0;
+  transition: height 1s ease-out, background-color 0.2s;
+  min-height: 4px;
+}
+
+.bar:hover {
+  background-color: var(--color-primary);
+}
+
+.barLabel {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.paymentTotal {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-success);
+  margin-bottom: 0.25rem;
+}
+
+.paymentSubtitle {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.paymentRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.paymentRow:last-child {
+  border-bottom: none;
+}
+
+.paymentLabel {
+  font-weight: 500;
+  color: var(--color-text-main);
+}
+
+.paymentValue {
+  font-weight: 600;
+}
+
+.paymentValue.danger {
+  color: var(--color-danger);
+}
+
+/* Donut chart simulation */
+.donutChartContainer {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donutSvg {
+  transform: rotate(-90deg);
+}
+
+.donutInfo {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.donutTotal {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.donutLabel {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.legend {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.legendLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legendColor {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
