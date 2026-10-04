@@ -304,7 +304,7 @@ export const Dashboard = () => {
                 </>
               ) : (
                 <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--color-text-muted)' }}>
-                  Aucun médecin orientateur enregistré.
+                  Aucune statistique disponible pour le moment.
                 </div>
               )}
             </CardContent>

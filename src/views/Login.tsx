@@ -82,7 +82,7 @@ export const Login = () => {
           <form className={styles.form} onSubmit={handleLogin}>
             <Input
               label="Identifiant"
-              placeholder="Saisissez 'admin'"
+              placeholder="Votre identifiant"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               leftIcon={<User size={18} />}
@@ -93,7 +93,7 @@ export const Login = () => {
               <Input
                 label="Mot de passe"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Saisissez 'admin123'"
+                placeholder="Votre mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 leftIcon={<Lock size={18} />}
