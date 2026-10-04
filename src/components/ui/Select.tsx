@@ -1,3 +1,5 @@
+"use client";
+
 import { forwardRef } from 'react';
 import type { SelectHTMLAttributes } from 'react';
 import clsx from 'clsx';
@@ -7,7 +9,7 @@ import styles from './Input.module.css';
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
-  options: { label: string; value: string | number }[];
+  options: { label: string; value?: string | number; options?: { label: string; value: string | number }[] }[];
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
@@ -35,12 +37,18 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             style={{ appearance: 'none' }} // Remove native arrow
             {...props}
           >
-            {/* If there's no placeholder option and value is empty, maybe add an empty default? 
-                For now we just map options */}
             {options.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              opt.options ? (
+                <optgroup key={opt.label} label={opt.label}>
+                  {opt.options.map(sub => (
+                    <option key={sub.value} value={sub.value}>{sub.label}</option>
+                  ))}
+                </optgroup>
+              ) : (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              )
             ))}
           </select>
           

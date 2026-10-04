@@ -1,11 +1,12 @@
+"use client";
+
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
 import clsx from 'clsx';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import styles from './AppLayout.module.css';
 
-export const AppLayout = () => {
+export const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const toggleSidebar = () => {
@@ -31,7 +32,7 @@ export const AppLayout = () => {
         <Header onMenuClick={toggleSidebar} />
         
         <main className={styles.pageContainer}>
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import { Plus, Trash2, Printer, Download } from 'lucide-react';
 import { Input } from '../components/ui/Input';
@@ -5,7 +7,7 @@ import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { mockPatients, mockInjuries } from '../data/mockData';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useApi as useLocalStorage } from '../hooks/useApi';
 import styles from './Prescriptions.module.css';
 
 export const Prescriptions = () => {
@@ -18,15 +20,15 @@ export const Prescriptions = () => {
   const [treatments, setTreatments] = useState([{ act: '', sessionsCount: '' as string | number, notes: '' }]);
   const [observations, setObservations] = useState('');
 
-  const selectedPatient = patients.find((p: any) => p.id === selectedPatientId);
+  const selectedPatient = patients.find((p: any) => p._id === selectedPatientId);
 
   // Auto-fill diagnosis based on patient's injury
   const handlePatientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const pid = e.target.value;
     setSelectedPatientId(pid);
-    const pat = patients.find((p: any) => p.id === pid);
+    const pat = patients.find((p: any) => p._id === pid);
     if (pat) {
-      const injury = injuries.find((i: any) => i.id === pat.injuryId);
+      const injury = injuries.find((i: any) => i._id === pat.injuryId);
       if (injury) {
         setDiagnosis(injury.name);
       }
@@ -86,7 +88,7 @@ export const Prescriptions = () => {
                 required
                 options={[
                   { label: '-- Sélectionner un patient --', value: '' },
-                  ...patients.map((p: any) => ({ label: `${p.lastName} ${p.firstName}`, value: p.id }))
+                  ...patients.map((p: any) => ({ label: `${p.lastName} ${p.firstName}`, value: p._id }))
                 ]}
                 value={selectedPatientId}
                 onChange={handlePatientChange}

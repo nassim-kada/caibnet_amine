@@ -1,8 +1,10 @@
+"use client";
+
 import {useState, useRef, useEffect } from 'react';
 import { Menu, Search, Calendar, LogOut, User, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter, usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { Input } from '../ui/Input';
 import styles from './Header.module.css';
@@ -14,8 +16,8 @@ interface HeaderProps {
 export const Header = ({ onMenuClick }: HeaderProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -32,12 +34,12 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   }, []);
 
   const handleLogout = () => {
-    navigate('/login');
+    router.push('/login');
   };
 
   // Determine page title based on route
   const getPageTitle = () => {
-    switch (location.pathname) {
+    switch (pathname) {
       case '/dashboard': return 'Tableau de bord';
       case '/patients': return 'Gestion des patients';
       case '/injuries': return 'Catalogue des blessures';

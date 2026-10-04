@@ -1,6 +1,9 @@
-import { NavLink } from 'react-router-dom';
+"use client";
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { LayoutDashboard, Users, Activity, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, FileText, Stethoscope } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -8,12 +11,16 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ isOpen }: SidebarProps) => {
+  const pathname = usePathname();
+  const userRole = typeof window !== 'undefined' ? localStorage.getItem('app_user_role') || 'admin' : 'admin';
+  
   const navItems = [
-    { name: 'Tableau de bord', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-    { name: 'Patients', path: '/patients', icon: <Users size={20} /> },
-    { name: 'Blessures', path: '/injuries', icon: <Activity size={20} /> },
-    { name: 'Ordonnances', path: '/prescriptions', icon: <FileText size={20} /> },
-  ];
+    { name: 'Tableau de bord', path: '/dashboard', icon: <LayoutDashboard size={20} />, roles: ['admin'] },
+    { name: 'Patients', path: '/patients', icon: <Users size={20} />, roles: ['admin', 'secretary'] },
+    { name: 'Médecins', path: '/doctors', icon: <Stethoscope size={20} />, roles: ['admin'] },
+    { name: 'Blessures', path: '/injuries', icon: <Activity size={20} />, roles: ['admin'] },
+    { name: 'Ordonnances', path: '/prescriptions', icon: <FileText size={20} />, roles: ['admin'] },
+  ].filter(item => item.roles.includes(userRole));
 
   return (
     <aside className={clsx(styles.sidebar, { [styles.open]: isOpen })}>
@@ -34,14 +41,14 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
 
       <nav className={styles.nav}>
         {navItems.map((item) => (
-          <NavLink
+          <Link
             key={item.path}
-            to={item.path}
-            className={({ isActive }) => clsx(styles.navItem, { [styles.active]: isActive })}
+            href={item.path}
+            className={clsx(styles.navItem, { [styles.active]: pathname.startsWith(item.path) })}
           >
             {item.icon}
             <span>{item.name}</span>
-          </NavLink>
+          </Link>
         ))}
       </nav>
     </aside>

@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -10,9 +12,9 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -26,10 +28,27 @@ export const Login = () => {
       return;
     }
 
-    if (username === 'admin' && password === 'admin123') {
-      navigate('/dashboard');
-    } else {
-      setError('Identifiants incorrects. Veuillez réessayer.');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        localStorage.setItem('app_user_role', data.role);
+        if (data.role === 'admin') {
+          router.push('/dashboard');
+        } else {
+          router.push('/patients');
+        }
+      } else {
+        setError(data.error || 'Identifiants incorrects. Veuillez réessayer.');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur.');
     }
   };
 

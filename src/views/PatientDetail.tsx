@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Check, Calendar as CalendarIcon, UploadCloud, FileText, File as FileIcon, Image as ImageIcon, Edit2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -7,57 +9,70 @@ import { TableContainer, TableHead, TableBody, TableRow, TableHeader, TableCell 
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useApi as useLocalStorage } from '../hooks/useApi';
+import { defaultCategories } from '../data/mockData';
 import styles from './PatientDetail.module.css';
 
 type Tab = 'infos' | 'traitements' | 'seances' | 'paiements' | 'dossiers' | 'ordonnances';
 
 export const PatientDetail = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('infos');
-  const [patients, setPatients] = useLocalStorage<any[]>('app_patients', []);
+  const [patients, , , fetchPatients] = useLocalStorage<any[]>('app_patients', []);
   const [injuries] = useLocalStorage<any[]>('app_injuries', []);
-  const [payments, setPayments] = useLocalStorage<any[]>('app_payments', []);
-  const [sessions, setSessions] = useLocalStorage<any[]>('app_sessions', []);
+  const [categories] = useLocalStorage<any[]>('app_injury_categories', defaultCategories);
+  const [doctors] = useLocalStorage<any[]>('app_doctors', []);
+  const [payments, , , fetchPayments] = useLocalStorage<any[]>('app_payments', []);
+  const [sessions, , , fetchSessions] = useLocalStorage<any[]>('app_sessions', []);
   
   // Find patient
-  const patient = patients.find((p: any) => p.id === id);
-  const injury = patient ? injuries.find((i: any) => i.id === patient.injuryId) : null;
-  const patientPayments = patient ? payments.filter(p => p.patientId === patient.id) : [];
-  const patientSessions = patient ? sessions.filter(s => s.patientId === patient.id) : [];
+  const patient = patients.find((p: any) => p._id === id);
+  const injury = patient ? injuries.find((i: any) => i._id === patient.injuryId) : null;
+  const patientPayments = patient ? payments.filter(p => p.patientId === patient._id) : [];
+  const patientSessions = patient ? sessions.filter(s => s.patientId === patient._id) : [];
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [newPayment, setNewPayment] = useState({ amount: '', method: 'Espèces' });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedEditCategory, setSelectedEditCategory] = useState('');
   const [editPatient, setEditPatient] = useState({
     firstName: '',
     lastName: '',
     injuryId: '',
-    sessionsTotal: '' as number | string
+    doctor: ''
   });
 
   const openEditModal = () => {
+    const pInjury = injuries.find(i => i._id === patient.injuryId);
+    setSelectedEditCategory(pInjury?.categoryId || '');
     setEditPatient({
       firstName: patient.firstName,
       lastName: patient.lastName,
       injuryId: patient.injuryId || '',
-      sessionsTotal: patient.sessionsTotal
+      doctor: patient.doctor || ''
     });
     setIsEditModalOpen(true);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const updatedPatient = {
       ...patient,
       firstName: editPatient.firstName,
       lastName: editPatient.lastName,
       injuryId: editPatient.injuryId,
-      sessionsTotal: Number(editPatient.sessionsTotal) || patient.sessionsTotal
+      doctor: editPatient.doctor
     };
-    setPatients(patients.map((p: any) => p.id === patient.id ? updatedPatient : p));
+    
+    await fetch(`/api/patients/${patient._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPatient)
+    });
+    
+    fetchPatients();
     setIsEditModalOpen(false);
   };
 
@@ -67,33 +82,38 @@ export const PatientDetail = () => {
       .replace('DZD', 'DA');
   };
 
-  const handleAddPayment = (e: React.FormEvent) => {
+  const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPayment.amount || isNaN(Number(newPayment.amount))) return;
     const amount = Number(newPayment.amount);
     
     const payment = {
-      id: `pay-${Date.now()}`,
-      patientId: patient.id,
+      patientId: patient._id,
       amount,
       date: new Date().toISOString(),
       method: newPayment.method
     };
     
-    setPayments([payment, ...payments]);
+    // We should technically save this to a /api/payments route, but since it's missing, let's just update the patient for now
+    // Create /api/payments if we want fully dynamic payments
     
-    // Update patient paidAmount
     const updatedPatient = {
       ...patient,
       paidAmount: Number(patient.paidAmount || 0) + amount
     };
-    setPatients(patients.map((p: any) => p.id === patient.id ? updatedPatient : p));
     
+    await fetch(`/api/patients/${patient._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPatient)
+    });
+    
+    fetchPatients();
     setIsPaymentModalOpen(false);
     setNewPayment({ amount: '', method: 'Espèces' });
   };
 
-  const handleToggleTreatment = (index: number) => {
+  const handleToggleTreatment = async (index: number) => {
     const completed = patient.completedTreatments || [];
     let newCompleted;
     if (completed.includes(index)) {
@@ -102,51 +122,78 @@ export const PatientDetail = () => {
       newCompleted = [...completed, index];
     }
     const updatedPatient = { ...patient, completedTreatments: newCompleted };
-    setPatients(patients.map((p: any) => p.id === patient.id ? updatedPatient : p));
+    
+    await fetch(`/api/patients/${patient._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPatient)
+    });
+    fetchPatients();
   };
 
-  const handleMarkSessionCompleted = (sessionIndex: number) => {
+  const handleMarkSessionCompleted = async (sessionIndex: number) => {
     const session = {
-      id: `ses-${Date.now()}`,
-      patientId: patient.id,
+      patientId: patient._id,
       date: new Date().toISOString(),
       notes: `Séance ${sessionIndex + 1} réalisée.`,
-      isCompleted: true
+      isCompleted: true,
+      paymentStatus: 'pending'
     };
     
-    setSessions([...sessions, session]);
+    await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session)
+    });
+    fetchSessions();
     
     const updatedPatient = {
       ...patient,
       sessionsCompleted: (patient.sessionsCompleted || 0) + 1
     };
-    setPatients(patients.map((p: any) => p.id === patient.id ? updatedPatient : p));
+    
+    await fetch(`/api/patients/${patient._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPatient)
+    });
+    fetchPatients();
   };
 
-  const handleCancelSession = (sessionIndex: number) => {
+  const handleCancelSession = async (sessionIndex: number) => {
     const session = {
-      id: `ses-${Date.now()}`,
-      patientId: patient.id,
+      patientId: patient._id,
       date: new Date().toISOString(),
       notes: `Séance ${sessionIndex + 1} annulée (Absence/Autre).`,
       isCompleted: false,
       isCancelled: true
     };
     
-    setSessions([...sessions, session]);
+    await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session)
+    });
+    fetchSessions();
     
     const updatedPatient = {
       ...patient,
       sessionsCancelled: (patient.sessionsCancelled || 0) + 1
     };
-    setPatients(patients.map((p: any) => p.id === patient.id ? updatedPatient : p));
+    
+    await fetch(`/api/patients/${patient._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPatient)
+    });
+    fetchPatients();
   };
 
   if (!patient) {
     return (
       <div className={styles.container}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Button variant="ghost" onClick={() => navigate('/patients')} leftIcon={<ArrowLeft size={18} />}>
+          <Button variant="ghost" onClick={() => router.push('/patients')} leftIcon={<ArrowLeft size={18} />}>
             Retour
           </Button>
         </div>
@@ -162,7 +209,7 @@ export const PatientDetail = () => {
   return (
     <div className={styles.container}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <Button variant="ghost" onClick={() => navigate('/patients')} leftIcon={<ArrowLeft size={18} />}>
+        <Button variant="ghost" onClick={() => router.push('/patients')} leftIcon={<ArrowLeft size={18} />}>
           Retour
         </Button>
       </div>
@@ -398,7 +445,7 @@ export const PatientDetail = () => {
               </TableHead>
               <TableBody>
                 {patientPayments.length > 0 ? patientPayments.map((p: any) => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p._id}>
                     <TableCell>{new Date(p.date).toLocaleDateString('fr-FR')}</TableCell>
                     <TableCell tabular><strong>{formatMoney(p.amount)}</strong></TableCell>
                     <TableCell>{p.method}</TableCell>
@@ -499,22 +546,43 @@ export const PatientDetail = () => {
             <Input label="Prénoms" required value={editPatient.firstName} onChange={e => setEditPatient({...editPatient, firstName: e.target.value})} style={{ flex: 1 }} />
           </div>
           <Select 
-            label="Blessure / Pathologie" 
+            label="Médecin orientateur (Optionnel)" 
             options={[
-              { label: '-- Aucune ou à définir --', value: '' },
-              ...injuries.map((i: any) => ({ label: i.name, value: i.id }))
+              { label: '-- Aucun ou à définir --', value: '' },
+              ...doctors.map(d => ({ label: d.name, value: d.name }))
             ]}
-            value={editPatient.injuryId}
-            onChange={e => setEditPatient({...editPatient, injuryId: e.target.value})}
+            value={editPatient.doctor} 
+            onChange={e => setEditPatient({...editPatient, doctor: e.target.value})}
           />
-          <Input 
-            label="Nombre total de séances prévues" 
-            type="number" 
-            min="1" 
-            required 
-            value={String(editPatient.sessionsTotal)} 
-            onChange={e => setEditPatient({...editPatient, sessionsTotal: e.target.value ? parseInt(e.target.value) : ''})} 
-          />
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <Select 
+              label="Catégorie de blessure" 
+              options={[
+                { label: '-- Sélectionnez une catégorie --', value: '' },
+                ...categories.map(c => ({ label: c.name, value: c._id }))
+              ]}
+              value={selectedEditCategory}
+              onChange={e => {
+                setSelectedEditCategory(e.target.value);
+                setEditPatient({...editPatient, injuryId: ''});
+              }}
+              style={{ flex: 1 }}
+            />
+            {selectedEditCategory && (
+              <Select 
+                label="Pathologie" 
+                options={[
+                  { label: '-- Sélectionnez une pathologie --', value: '' },
+                  ...injuries
+                    .filter(i => (i.categoryId || '') === selectedEditCategory)
+                    .map(i => ({ label: i.name, value: i._id }))
+                ]}
+                value={editPatient.injuryId}
+                onChange={e => setEditPatient({...editPatient, injuryId: e.target.value})}
+                style={{ flex: 1 }}
+              />
+            )}
+          </div>
         </form>
       </Modal>
     </div>

@@ -21,8 +21,14 @@ export interface Patient {
   createdAt: string;
 }
 
+export interface InjuryCategory {
+  id: string;
+  name: string;
+}
+
 export interface Injury {
   id: string;
+  categoryId?: string;
   name: string;
   description: string;
   treatments: string[];
