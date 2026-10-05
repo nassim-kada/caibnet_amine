@@ -32,8 +32,6 @@ export const PatientDetail = () => {
   const patientPayments = patient ? payments.filter(p => p.patientId === patient._id) : [];
   const patientSessions = patient ? sessions.filter(s => s.patientId === patient._id) : [];
 
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [newPayment, setNewPayment] = useState({ amount: '', method: 'Espèces' });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEditCategory, setSelectedEditCategory] = useState('');
@@ -41,7 +39,10 @@ export const PatientDetail = () => {
     firstName: '',
     lastName: '',
     injuryId: '',
-    doctor: ''
+    doctor: '',
+    sessionsCompleted: 0,
+    paidSessions: 0,
+    unpaidSessions: 0
   });
 
   const openEditModal = () => {
@@ -51,7 +52,10 @@ export const PatientDetail = () => {
       firstName: patient.firstName,
       lastName: patient.lastName,
       injuryId: patient.injuryId || '',
-      doctor: patient.doctor || ''
+      doctor: patient.doctor || '',
+      sessionsCompleted: patient.sessionsCompleted || 0,
+      paidSessions: patient.paidSessions || 0,
+      unpaidSessions: patient.unpaidSessions || 0
     });
     setIsEditModalOpen(true);
   };
@@ -63,7 +67,10 @@ export const PatientDetail = () => {
       firstName: editPatient.firstName,
       lastName: editPatient.lastName,
       injuryId: editPatient.injuryId,
-      doctor: editPatient.doctor
+      doctor: editPatient.doctor,
+      sessionsCompleted: editPatient.sessionsCompleted,
+      paidSessions: editPatient.paidSessions,
+      unpaidSessions: editPatient.unpaidSessions
     };
     
     await fetch(`/api/patients/${patient._id}`, {
@@ -82,24 +89,31 @@ export const PatientDetail = () => {
       .replace('DZD', 'DA');
   };
 
-  const handleAddPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPayment.amount || isNaN(Number(newPayment.amount))) return;
-    const amount = Number(newPayment.amount);
+
+
+  const handleToggleSessionPayment = async (session: any) => {
+    const isCurrentlyPaid = session.paymentStatus === 'paid';
+    const newStatus = isCurrentlyPaid ? 'unpaid' : 'paid';
     
-    const payment = {
-      patientId: patient._id,
-      amount,
-      date: new Date().toISOString(),
-      method: newPayment.method
-    };
+    // Determine session price
+    const sessionPrice = patient.totalAmount && patient.sessionsTotal 
+      ? Number(patient.totalAmount) / Number(patient.sessionsTotal)
+      : 1500; // Default price if not set
+
+    // Update session
+    await fetch(`/api/sessions/${session._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: newStatus })
+    });
+    fetchSessions();
     
-    // We should technically save this to a /api/payments route, but since it's missing, let's just update the patient for now
-    // Create /api/payments if we want fully dynamic payments
-    
+    // Update patient paidAmount
     const updatedPatient = {
       ...patient,
-      paidAmount: Number(patient.paidAmount || 0) + amount
+      paidAmount: isCurrentlyPaid 
+        ? Math.max(0, Number(patient.paidAmount || 0) - sessionPrice)
+        : Number(patient.paidAmount || 0) + sessionPrice
     };
     
     await fetch(`/api/patients/${patient._id}`, {
@@ -107,10 +121,7 @@ export const PatientDetail = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedPatient)
     });
-    
     fetchPatients();
-    setIsPaymentModalOpen(false);
-    setNewPayment({ amount: '', method: 'Espèces' });
   };
 
   const handleToggleTreatment = async (index: number) => {
@@ -396,7 +407,7 @@ export const PatientDetail = () => {
                           </div>
                         )}
                         {(isCompleted || isCancelled) && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginTop: '0.5rem', display: 'block' }}>
                             {new Date(session.date).toLocaleDateString('fr-FR')}
                           </span>
                         )}
@@ -414,87 +425,58 @@ export const PatientDetail = () => {
 
         {activeTab === 'paiements' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: '2rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Total à payer</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-primary)' }}>{formatMoney(Number(patient.totalAmount || 0))}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Déjà payé</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-success)' }}>{formatMoney(Number(patient.paidAmount || 0))}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Restant dû</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: remaining > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                    {formatMoney(remaining)}
-                  </div>
-                </div>
-              </div>
-              <Button onClick={() => setIsPaymentModalOpen(true)}>Ajouter un versement</Button>
-            </div>
-
-            <TableContainer>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Date</TableHeader>
-                  <TableHeader>Montant</TableHeader>
-                  <TableHeader>Méthode</TableHeader>
-                  <TableHeader>Reçu</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {patientPayments.length > 0 ? patientPayments.map((p: any) => (
-                  <TableRow key={p._id}>
-                    <TableCell>{new Date(p.date).toLocaleDateString('fr-FR')}</TableCell>
-                    <TableCell tabular><strong>{formatMoney(p.amount)}</strong></TableCell>
-                    <TableCell>{p.method}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" leftIcon={<FileText size={16} />}>Facture</Button>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow>
-                    <TableCell colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>Aucun paiement enregistré</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </TableContainer>
-
-            <Modal
-              isOpen={isPaymentModalOpen}
-              onClose={() => setIsPaymentModalOpen(false)}
-              title="Ajouter un versement"
-              footer={
-                <>
-                  <Button variant="ghost" onClick={() => setIsPaymentModalOpen(false)}>Annuler</Button>
-                  <Button form="payment-form" type="submit">Valider le paiement</Button>
-                </>
-              }
-            >
-              <form id="payment-form" onSubmit={handleAddPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
+                Vous pouvez modifier directement le nombre de séances ci-dessous. Les modifications sont enregistrées automatiquement.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                 <Input 
-                  label="Montant (DA)" 
-                  type="number" 
+                  label="Séances effectuées" 
+                  type="number"
                   min="0"
-                  required 
-                  value={newPayment.amount}
-                  onChange={e => setNewPayment({...newPayment, amount: e.target.value})}
-                  placeholder="Ex: 5000"
+                  value={patient.sessionsCompleted || 0}
+                  onChange={async (e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    await fetch(`/api/patients/${patient._id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ...patient, sessionsCompleted: val })
+                    });
+                    fetchPatients();
+                  }}
                 />
-                <Select
-                  label="Méthode de paiement"
-                  options={[
-                    { label: 'Espèces', value: 'Espèces' },
-                    { label: 'Carte', value: 'Carte' },
-                    { label: 'Chèque', value: 'Chèque' },
-                    { label: 'Virement', value: 'Virement' }
-                  ]}
-                  value={newPayment.method}
-                  onChange={e => setNewPayment({...newPayment, method: e.target.value})}
+                <Input 
+                  label="Séances payées" 
+                  type="number"
+                  min="0"
+                  value={patient.paidSessions || 0}
+                  onChange={async (e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    await fetch(`/api/patients/${patient._id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ...patient, paidSessions: val })
+                    });
+                    fetchPatients();
+                  }}
                 />
-              </form>
-            </Modal>
+                <Input 
+                  label="Séances impayées (Dette)" 
+                  type="number"
+                  min="0"
+                  value={patient.unpaidSessions || 0}
+                  onChange={async (e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    await fetch(`/api/patients/${patient._id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ...patient, unpaidSessions: val })
+                    });
+                    fetchPatients();
+                  }}
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -582,6 +564,31 @@ export const PatientDetail = () => {
                 style={{ flex: 1 }}
               />
             )}
+          </div>
+
+          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--color-primary)' }}>Gestion avancée des séances</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+              <Input 
+                label="Séances terminées" 
+                type="number" 
+                value={editPatient.sessionsCompleted} 
+                onChange={e => setEditPatient({...editPatient, sessionsCompleted: parseInt(e.target.value) || 0})} 
+              />
+              <Input 
+                label="Séances payées" 
+                type="number" 
+                value={editPatient.paidSessions} 
+                onChange={e => setEditPatient({...editPatient, paidSessions: parseInt(e.target.value) || 0})} 
+              />
+              <Input 
+                label="Séances NON payées (Dettes)" 
+                type="number" 
+                value={editPatient.unpaidSessions} 
+                onChange={e => setEditPatient({...editPatient, unpaidSessions: parseInt(e.target.value) || 0})} 
+              />
+            </div>
           </div>
         </form>
       </Modal>

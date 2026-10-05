@@ -38,7 +38,7 @@
 /* Paper A4 styling */
 .paper {
   width: 210mm;
-  min-height: 297mm;
+  min-height: 270mm; /* Adjusted to prevent 2nd page blank with margins */
   background-color: white;
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
   padding: 20mm;

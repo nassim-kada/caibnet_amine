@@ -9,7 +9,17 @@ const PatientSchema = new mongoose.Schema({
   status: { type: String, default: 'Actif' },
   injuryId: { type: String },
   doctor: { type: String },
-  isPending: { type: Boolean, default: false } // For form pre-registration
+  isPending: { type: Boolean, default: false }, // For form pre-registration
+  sessionsTotal: { type: Number, default: 0 },
+  sessionsCompleted: { type: Number, default: 0 },
+  sessionsCancelled: { type: Number, default: 0 },
+  totalAmount: { type: Number, default: 0 },
+  paidAmount: { type: Number, default: 0 },
+  completedTreatments: { type: [Number], default: [] },
+  inWaitingRoom: { type: Boolean, default: false },
+  paidSessions: { type: Number, default: 0 },
+  unpaidSessions: { type: Number, default: 0 },
+  consultationStatus: { type: String, enum: ['waiting', 'in_progress', 'finished', 'none'], default: 'none' }
 }, { timestamps: true });
 
 export default mongoose.models.Patient || mongoose.model('Patient', PatientSchema);

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from 'react';
-import { Users, CheckCircle, Activity, TrendingUp } from 'lucide-react';
+import { useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Users, CheckCircle, Activity, TrendingUp, ArrowRight, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { TableContainer, TableHead, TableBody, TableRow, TableHeader, TableCell } from '../components/ui/Table';
@@ -11,7 +12,8 @@ import { defaultCategories } from '../data/mockData';
 import styles from './Dashboard.module.css';
 
 export const Dashboard = () => {
-  const [patients] = useLocalStorage<any[]>('app_patients', []);
+  const router = useRouter();
+  const [patients, , , fetchPatients] = useLocalStorage<any[]>('app_patients', []);
   const [sessions] = useLocalStorage<any[]>('app_sessions', []);
   const [injuries] = useLocalStorage<any[]>('app_injuries', []);
   const [categories] = useLocalStorage<any[]>('app_injury_categories', defaultCategories);
@@ -33,6 +35,14 @@ export const Dashboard = () => {
   const totalExpected = patients.reduce((sum: number, p: any) => sum + p.totalAmount, 0);
   const totalPaid = patients.reduce((sum: number, p: any) => sum + p.paidAmount, 0);
   const totalRemaining = totalExpected - totalPaid;
+
+  const currentPatient = useMemo(() => patients.find((p: any) => p.inWaitingRoom), [patients]);
+
+  const unpaidPatients = useMemo(() => {
+    return patients
+      .filter((p: any) => p.unpaidSessions && p.unpaidSessions > 0)
+      .sort((a: any, b: any) => b.unpaidSessions - a.unpaidSessions);
+  }, [patients]);
 
 
   // Dynamic top doctors donut chart
@@ -95,8 +105,36 @@ export const Dashboard = () => {
       });
   }, [patients, injuries, categories]);
 
+  // Polling to auto-refresh data
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPatients();
+    }, 5000); // 5 seconds
+    return () => clearInterval(interval);
+  }, [fetchPatients]);
+
   return (
     <div className={styles.dashboard}>
+      {/* Current Patient Alert */}
+      {currentPatient && (
+        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--color-primary)', borderLeft: '4px solid var(--color-accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', color: 'white' }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Activity size={20} color="white" /> Client d'aujourd'hui (En cours de consultation)
+            </h2>
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>
+              {currentPatient.firstName} {currentPatient.lastName}
+            </p>
+          </div>
+          <button 
+            onClick={() => router.push(`/patients/${currentPatient._id}`)}
+            style={{ padding: '0.75rem 1.5rem', backgroundColor: 'white', color: 'var(--color-primary)', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+          >
+            Consulter le dossier <ArrowRight size={18} />
+          </button>
+        </div>
+      )}
+
       {/* Stats row */}
       <div className={styles.statsGrid}>
         <Card>
@@ -185,6 +223,58 @@ export const Dashboard = () => {
                       </TableRow>
                     );
                   })}
+                </TableBody>
+              </TableContainer>
+            </CardContent>
+          </Card>
+
+          {/* Unpaid Patients Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)' }}>
+                <AlertCircle size={20} /> Liste des impayés
+              </CardTitle>
+            </CardHeader>
+            <CardContent style={{ padding: 0 }}>
+              <TableContainer style={{ border: 'none', borderRadius: 0 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Patient</TableHeader>
+                    <TableHeader>Téléphone</TableHeader>
+                    <TableHeader>Séances non payées</TableHeader>
+                    <TableHeader>Action</TableHeader>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {unpaidPatients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        Aucun impayé trouvé.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    unpaidPatients.slice(0, 10).map((patient: any) => (
+                      <TableRow key={patient._id}>
+                        <TableCell>
+                          <strong>{patient.lastName} {patient.firstName}</strong>
+                        </TableCell>
+                        <TableCell>{patient.phone || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="danger">
+                            {patient.unpaidSessions} séance(s)
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <button 
+                            onClick={() => router.push(`/patients/${patient._id}`)}
+                            style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+                          >
+                            Voir le dossier
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </TableContainer>
             </CardContent>

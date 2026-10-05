@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, Eye, Edit2, Trash2, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Input } from '../components/ui/Input';
@@ -22,6 +22,51 @@ export const Patients = () => {
   const [sessions, , , fetchSessions] = useLocalStorage<any[]>('app_sessions', []);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [activeTab, setActiveTab] = useState<'tous' | 'salle' | 'jour'>('tous');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const role = localStorage.getItem('app_user_role');
+      if (role === 'admin') {
+        setIsAdmin(true);
+        setActiveTab('tous'); // Force admin to 'tous' tab
+      }
+      
+      // Daily reset logic
+      const lastReset = localStorage.getItem('app_last_reset_date');
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (lastReset !== today && patients.length > 0) {
+        let hasChanges = false;
+        const updatedPatients = patients.map(p => {
+          if (p.isPending || p.inWaitingRoom) {
+            hasChanges = true;
+            return { ...p, isPending: false, inWaitingRoom: false, consultationStatus: 'none' };
+          }
+          return p;
+        });
+
+        if (hasChanges) {
+          // In a real app we'd call the API for each or a bulk endpoint
+          // For simplicity here, since useLocalStorage syncs to API via its own mechanisms if wrapped, 
+          // or we just call the API manually for the changed ones:
+          Promise.all(updatedPatients.filter((p, i) => patients[i].isPending || patients[i].inWaitingRoom).map(p => 
+            fetch(`/api/patients/${p._id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(p)
+            })
+          )).then(() => {
+            fetchPatients();
+            localStorage.setItem('app_last_reset_date', today);
+          });
+        } else {
+          localStorage.setItem('app_last_reset_date', today);
+        }
+      }
+    }
+  }, [patients.length]); // run when patients are loaded
   
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -62,10 +107,11 @@ export const Patients = () => {
     const patient = {
       ...newPatient,
       gender: newPatient.gender as 'H' | 'F',
-      sessionsTotal: 10,
       sessionsCompleted: 0,
       status: 'En cours',
-      isPending: false
+      isPending: activeTab === 'jour',
+      inWaitingRoom: activeTab === 'salle',
+      consultationStatus: activeTab === 'salle' ? 'waiting' : 'none'
     };
     
     await fetch('/api/patients', {
@@ -84,34 +130,70 @@ export const Patients = () => {
     setSelectedAddCategory('');
   };
 
-  const pendingSessions = (sessions || []).filter((s: any) => s.paymentStatus === 'pending');
-
-  const handleValidatePayment = async (sessionId: string, patientId: string, isPaid: boolean) => {
-    // 1. Update session paymentStatus to 'paid' or 'unpaid'
-    await fetch(`/api/sessions/${sessionId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentStatus: isPaid ? 'paid' : 'unpaid' })
-    });
-    
-    // 2. If paid, update patient's paidAmount
-    if (isPaid) {
-      const patient = patients.find((p: any) => p._id === patientId);
-      if (patient) {
-        const updatedPatient = {
-          ...patient,
-          paidAmount: Number(patient.paidAmount || 0) + 1500 // Assuming 1500 DA per session
-        };
-        await fetch(`/api/patients/${patientId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedPatient)
-        });
-        fetchPatients();
-      }
+  const handleAddToWaitingRoom = async (patientId: string) => {
+    const patient = patients.find((p: any) => p._id === patientId);
+    if (patient) {
+      await fetch(`/api/patients/${patientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patient, inWaitingRoom: true, consultationStatus: 'waiting' })
+      });
+      fetchPatients();
     }
-    fetchSessions();
   };
+
+  const handleUpdateConsultationStatus = async (patientId: string, status: string) => {
+    const patient = patients.find((p: any) => p._id === patientId);
+    if (patient) {
+      await fetch(`/api/patients/${patientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patient, consultationStatus: status })
+      });
+      fetchPatients();
+    }
+  };
+
+  const handleProcessSession = async (patientId: string, isPaid: boolean) => {
+    const patient = patients.find((p: any) => p._id === patientId);
+    if (patient) {
+      const updatedPatient = {
+        ...patient,
+        inWaitingRoom: false, // Sort de la salle d'attente
+        consultationStatus: 'none',
+        sessionsCompleted: (patient.sessionsCompleted || 0) + 1,
+        paidSessions: isPaid ? (patient.paidSessions || 0) + 1 : (patient.paidSessions || 0),
+        unpaidSessions: !isPaid ? (patient.unpaidSessions || 0) + 1 : (patient.unpaidSessions || 0)
+      };
+
+      await fetch(`/api/patients/${patientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedPatient)
+      });
+      fetchPatients();
+    }
+  };
+
+  const handleCancelSession = async (patientId: string) => {
+    const patient = patients.find((p: any) => p._id === patientId);
+    if (patient) {
+      const updatedPatient = {
+        ...patient,
+        inWaitingRoom: false,
+        consultationStatus: 'none',
+      };
+
+      await fetch(`/api/patients/${patientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedPatient)
+      });
+      fetchPatients();
+    }
+  };
+
+  const waitingRoomPatients = (patients || []).filter(p => p.inWaitingRoom);
 
   return (
     <div className={styles.container}>
@@ -143,7 +225,87 @@ export const Patients = () => {
         </Button>
       </div>
 
-      {/* Section : Demandes en ligne (Pré-inscriptions) */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)' }}>
+        {!isAdmin && (
+          <>
+            <button 
+              style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'salle' ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === 'salle' ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: activeTab === 'salle' ? 600 : 400, cursor: 'pointer', fontSize: '1rem' }}
+              onClick={() => setActiveTab('salle')}
+            >
+              En cours de consultation ({waitingRoomPatients.length})
+            </button>
+            <button 
+              style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'jour' ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === 'jour' ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: activeTab === 'jour' ? 600 : 400, cursor: 'pointer', fontSize: '1rem' }}
+              onClick={() => setActiveTab('jour')}
+            >
+              Patients du jour ({patients.filter(p => p.isPending).length})
+            </button>
+          </>
+        )}
+        <button 
+          style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'tous' ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === 'tous' ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: activeTab === 'tous' ? 600 : 400, cursor: 'pointer', fontSize: '1rem' }}
+          onClick={() => setActiveTab('tous')}
+        >
+          Tous les patients
+        </button>
+      </div>
+
+      {activeTab === 'salle' && (
+        <div>
+          {waitingRoomPatients.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
+              Aucun patient en cours de consultation actuellement.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+              {waitingRoomPatients.map(patient => (
+                <div key={patient._id} style={{ padding: '1.5rem', backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 0.5rem 0' }}>{patient.firstName} {patient.lastName}</h3>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{patient.doctor || 'Sans médecin assigné'}</div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                    {typeof window !== 'undefined' && localStorage.getItem('app_user_role') === 'admin' ? (
+                      // Vue Admin (Médecin)
+                      <Badge variant="warning" style={{ flex: 1, textAlign: 'center' }}>En cours de consultation</Badge>
+                    ) : (
+                      // Vue Secrétaire
+                      <>
+                        <Button 
+                          style={{ flex: 1, backgroundColor: 'var(--color-success)' }} 
+                          onClick={() => handleProcessSession(patient._id, true)}
+                        >
+                          PAYÉ
+                        </Button>
+                        <Button 
+                          style={{ flex: 1 }} 
+                          variant="danger" 
+                          onClick={() => handleProcessSession(patient._id, false)}
+                        >
+                          NON PAYÉ
+                        </Button>
+                        <Button 
+                          style={{ flex: 1 }} 
+                          variant="ghost" 
+                          onClick={() => handleCancelSession(patient._id)}
+                          title="Annuler l'entrée par erreur"
+                        >
+                          Annuler
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'jour' && (
+        <>
+          {/* Section : Demandes en ligne (Pré-inscriptions) */}
       {patients.filter(p => p.isPending).length > 0 && (
         <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary)' }}>
@@ -177,35 +339,17 @@ export const Patients = () => {
           </div>
         </div>
       )}
-
-      {/* Section : Paiements en attente (Secrétaire) */}
-      {typeof window !== 'undefined' && localStorage.getItem('app_user_role') === 'secretary' && (
-        <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '12px', border: '1px solid #ffe69c' }}>
-          <h3 style={{ marginBottom: '1rem', color: '#856404' }}>⚠️ Séances en attente de paiement (Aujourd'hui)</h3>
-          {pendingSessions.length === 0 ? (
-            <p style={{ color: '#856404' }}>Aucune séance en attente de paiement pour le moment.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {pendingSessions.map((session: any) => {
-                const pat = patients.find((p: any) => p._id === session.patientId);
-                return (
-                  <div key={session._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #ffe69c' }}>
-                    <div>
-                      <strong>{pat?.firstName} {pat?.lastName}</strong> a terminé une séance.
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <Button size="sm" onClick={() => handleValidatePayment(session._id, session.patientId, true)}>Oui (Payé)</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleValidatePayment(session._id, session.patientId, false)} style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}>Non (Impayé)</Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {patients.filter(p => p.isPending).length === 0 && (
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
+          Aucun patient n'a rempli le formulaire pour aujourd'hui.
         </div>
       )}
+      </>
+      )}
 
-      <TableContainer>
+      {activeTab === 'tous' && (
+        <>
+          <TableContainer>
         <TableHead>
           <TableRow>
             <TableHeader>Patient</TableHeader>
@@ -220,16 +364,23 @@ export const Patients = () => {
         <TableBody>
           {filteredPatients.length > 0 ? filteredPatients.map(patient => {
             const injury = injuries.find((i: any) => i._id === patient.injuryId);
-            const progress = (patient.sessionsCompleted / patient.sessionsTotal) * 100;
-            const remaining = patient.totalAmount - patient.paidAmount;
+            const totalSessions = patient.sessionsTotal || 10;
+            const completed = patient.sessionsCompleted || 0;
+            const progress = (completed / totalSessions) * 100;
+            
+            const unpaid = patient.unpaidSessions || 0;
+            const paid = patient.paidSessions || 0;
             
             let paymentStatus = 'Soldé';
             let paymentVariant: 'success' | 'warning' | 'danger' = 'success';
-            if (patient.paidAmount === 0) {
-              paymentStatus = 'Impayé';
+            if (unpaid > 0) {
+              paymentStatus = `${unpaid} impayée(s)`;
               paymentVariant = 'danger';
-            } else if (remaining > 0) {
-              paymentStatus = 'Partiel';
+            } else if (paid > 0 && unpaid === 0) {
+              paymentStatus = 'À jour';
+              paymentVariant = 'success';
+            } else {
+              paymentStatus = 'Aucune séance';
               paymentVariant = 'warning';
             }
 
@@ -242,10 +393,7 @@ export const Patients = () => {
                 <TableCell>{injury?.name}</TableCell>
                 <TableCell>
                   <div className={styles.progressContainer}>
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-                    </div>
-                    <span className={styles.progressText}>{patient.sessionsCompleted}/{patient.sessionsTotal}</span>
+                    <span className={styles.progressText}>{patient.sessionsCompleted} séance(s)</span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -255,12 +403,18 @@ export const Patients = () => {
                   <Badge variant={patient.status === 'Terminé' ? 'success' : 'warning'}>{patient.status}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div className={styles.actions}>
+                  <div className={styles.actions} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {!patient.inWaitingRoom ? (
+                      !isAdmin && (
+                        <Button size="sm" variant="outline" onClick={() => handleAddToWaitingRoom(patient._id)}>
+                          Faire entrer
+                        </Button>
+                      )
+                    ) : (
+                      <Badge variant="warning">En attente</Badge>
+                    )}
                     <button className={styles.actionButton} onClick={() => router.push(`/patients/${patient._id}`)} title="Voir le dossier">
                       <Eye size={18} />
-                    </button>
-                    <button className={styles.actionButton} onClick={() => router.push(`/patients/${patient._id}`)} title="Modifier">
-                      <Edit2 size={18} />
                     </button>
                     <button 
                       className={`${styles.actionButton} ${styles.danger}`} 
@@ -291,6 +445,8 @@ export const Patients = () => {
           )}
         </TableBody>
       </TableContainer>
+      </>
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal 
@@ -311,13 +467,18 @@ export const Patients = () => {
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Nouveau Patient"
+        title={
+          <div className={styles.premiumModalHeader}>
+            <h2>Créer un nouveau dossier patient</h2>
+            <p style={{ margin: '0.5rem 0 0 0', opacity: 0.9, fontSize: '0.875rem' }}>Veuillez remplir les informations ci-dessous</p>
+          </div>
+        }
         size="lg"
         footer={
-          <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', width: '100%' }}>
             <Button variant="ghost" onClick={() => setIsAddModalOpen(false)}>Annuler</Button>
-            <Button form="add-patient-form" type="submit">Créer le dossier</Button>
-          </>
+            <button form="add-patient-form" type="submit" className={styles.premiumSubmitBtn}>Créer le dossier</button>
+          </div>
         }
       >
         <form id="add-patient-form" onSubmit={handleAddPatient} className={styles.formGrid}>

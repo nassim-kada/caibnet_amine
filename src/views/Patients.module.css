@@ -88,15 +88,56 @@
   color: var(--color-text-muted);
 }
 
-/* Patient Form Styles */
+/* Premium Form Styles */
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  gap: 1.5rem;
+  padding: 1rem;
 }
 
 .formFull {
   grid-column: 1 / -1;
+}
+
+.formRow {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 1.5rem;
+}
+
+.premiumModalHeader {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  color: white;
+  padding: 1.5rem;
+  border-radius: 12px 12px 0 0;
+  margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.premiumModalHeader h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.premiumSubmitBtn {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(15, 143, 148, 0.4);
+  transition: all 0.3s ease;
+}
+
+.premiumSubmitBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 143, 148, 0.6);
 }
 
 @media (max-width: 768px) {
