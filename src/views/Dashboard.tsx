@@ -14,29 +14,15 @@ import styles from './Dashboard.module.css';
 export const Dashboard = () => {
   const router = useRouter();
   const [patients, , , fetchPatients] = useLocalStorage<any[]>('app_patients', []);
-  const [sessions] = useLocalStorage<any[]>('app_sessions', []);
   const [injuries] = useLocalStorage<any[]>('app_injuries', []);
   const [categories] = useLocalStorage<any[]>('app_injury_categories', defaultCategories);
   
-  const todaySessions = useMemo(() => sessions.filter(s => new Date(s.date).toDateString() === new Date().toDateString()), [sessions]);
+  const todayPatients = useMemo(() => patients.filter((p: any) => p.createdAt && new Date(p.createdAt).toDateString() === new Date().toDateString()), [patients]);
   
-  // Calculate some mock stats
-  const todayPatientsCount = todaySessions.length;
-  const todayCompletedCount = todaySessions.filter(s => s.isCompleted).length;
-  const activePatientsCount = patients.filter((p: any) => p.status === 'En cours').length;
-  const totalCompletedCount = patients.filter((p: any) => p.status === 'Terminé').length;
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('fr-DZ', { style: 'currency', currency: 'DZD' })
-      .format(amount)
-      .replace('DZD', 'DA');
-  };
-
-  const totalExpected = patients.reduce((sum: number, p: any) => sum + p.totalAmount, 0);
-  const totalPaid = patients.reduce((sum: number, p: any) => sum + p.paidAmount, 0);
-  const totalRemaining = totalExpected - totalPaid;
-
-  const currentPatient = useMemo(() => patients.find((p: any) => p.inWaitingRoom), [patients]);
+  const todayPatientsCount = todayPatients.length;
+  const totalSessionsCompleted = patients.reduce((sum: number, p: any) => sum + (p.sessionsCompleted || 0), 0);
+  const activePatientsCount = patients.filter((p: any) => p.status === 'En cours' || !p.status).length;
+  const totalPatientsCount = patients.length;
 
   const unpaidPatients = useMemo(() => {
     return patients
@@ -79,7 +65,7 @@ export const Dashboard = () => {
     let totalAssigned = 0;
     const catCounts = patients.reduce((acc, p) => {
       if (p.injuryId) {
-        const inj = injuries.find(i => i._id === p.injuryId);
+        const inj = injuries.find((i: any) => i._id === p.injuryId);
         if (inj && inj.categoryId) {
           acc[inj.categoryId] = (acc[inj.categoryId] || 0) + 1;
           totalAssigned++;
@@ -95,7 +81,7 @@ export const Dashboard = () => {
     return (Object.entries(catCounts) as [string, number][])
       .sort((a, b) => b[1] - a[1])
       .map(([catId, count], index) => {
-        const cat = categories.find(c => c._id === catId);
+        const cat = categories.find((c: any) => c._id === catId);
         const percentage = Math.round((count / totalAssigned) * 100);
         return {
           label: cat ? cat.name : 'Inconnu',
@@ -115,26 +101,6 @@ export const Dashboard = () => {
 
   return (
     <div className={styles.dashboard}>
-      {/* Current Patient Alert */}
-      {currentPatient && (
-        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--color-primary)', borderLeft: '4px solid var(--color-accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', color: 'white' }}>
-          <div>
-            <h2 style={{ margin: 0, color: 'white', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={20} color="white" /> Client d'aujourd'hui (En cours de consultation)
-            </h2>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>
-              {currentPatient.firstName} {currentPatient.lastName}
-            </p>
-          </div>
-          <button 
-            onClick={() => router.push(`/patients/${currentPatient._id}`)}
-            style={{ padding: '0.75rem 1.5rem', backgroundColor: 'white', color: 'var(--color-primary)', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-          >
-            Consulter le dossier <ArrowRight size={18} />
-          </button>
-        </div>
-      )}
-
       {/* Stats row */}
       <div className={styles.statsGrid}>
         <Card>
@@ -143,7 +109,7 @@ export const Dashboard = () => {
               <Users size={24} />
             </div>
             <div className={styles.statInfo}>
-              <span className={styles.statLabel}>Patients reçus aujourd'hui</span>
+              <span className={styles.statLabel}>Nouveaux patients (Jour)</span>
               <span className={styles.statValue}>{todayPatientsCount}</span>
             </div>
           </div>
@@ -155,8 +121,8 @@ export const Dashboard = () => {
               <CheckCircle size={24} />
             </div>
             <div className={styles.statInfo}>
-              <span className={styles.statLabel}>Séances terminées (Jour)</span>
-              <span className={styles.statValue}>{todayCompletedCount}</span>
+              <span className={styles.statLabel}>Total séances effectuées</span>
+              <span className={styles.statValue}>{totalSessionsCompleted}</span>
             </div>
           </div>
         </Card>
@@ -167,7 +133,7 @@ export const Dashboard = () => {
               <Activity size={24} />
             </div>
             <div className={styles.statInfo}>
-              <span className={styles.statLabel}>Patients en cours</span>
+              <span className={styles.statLabel}>Patients actifs</span>
               <span className={styles.statValue}>{activePatientsCount}</span>
             </div>
           </div>
@@ -179,8 +145,8 @@ export const Dashboard = () => {
               <TrendingUp size={24} />
             </div>
             <div className={styles.statInfo}>
-              <span className={styles.statLabel}>Total patients terminés</span>
-              <span className={styles.statValue}>{totalCompletedCount}</span>
+              <span className={styles.statLabel}>Total patients</span>
+              <span className={styles.statValue}>{totalPatientsCount}</span>
             </div>
           </div>
         </Card>
@@ -191,7 +157,7 @@ export const Dashboard = () => {
           {/* Today's Patients Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Patients du jour</CardTitle>
+              <CardTitle>Patients enregistrés aujourd'hui</CardTitle>
             </CardHeader>
             <CardContent style={{ padding: 0 }}>
               <TableContainer style={{ border: 'none', borderRadius: 0 }}>
@@ -200,29 +166,39 @@ export const Dashboard = () => {
                     <TableHeader>Patient</TableHeader>
                     <TableHeader>Médecin</TableHeader>
                     <TableHeader>Heure</TableHeader>
-                    <TableHeader>Statut</TableHeader>
+                    <TableHeader>Action</TableHeader>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {todaySessions.map((session) => {
-                    const patient = patients.find((p: any) => p._id === session.patientId);
-                    const time = new Date(session.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                    
-                    return (
-                      <TableRow key={session._id}>
-                        <TableCell>
-                          <strong>{patient?.lastName} {patient?.firstName}</strong>
-                        </TableCell>
-                        <TableCell>{patient?.doctor}</TableCell>
-                        <TableCell>{time}</TableCell>
-                        <TableCell>
-                          <Badge variant={session.isCompleted ? 'success' : 'warning'}>
-                            {session.isCompleted ? 'Terminé' : 'En attente'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {todayPatients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        Aucun patient enregistré aujourd'hui.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    todayPatients.map((patient: any) => {
+                      const time = patient.createdAt ? new Date(patient.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '-';
+                      
+                      return (
+                        <TableRow key={patient._id}>
+                          <TableCell>
+                            <strong>{patient.lastName} {patient.firstName}</strong>
+                          </TableCell>
+                          <TableCell>{patient.doctor || '-'}</TableCell>
+                          <TableCell>{time}</TableCell>
+                          <TableCell>
+                            <button 
+                              onClick={() => router.push(`/patients/${patient._id}`)}
+                              style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+                            >
+                              Voir le dossier
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </TableContainer>
             </CardContent>

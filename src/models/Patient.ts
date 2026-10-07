@@ -19,7 +19,9 @@ const PatientSchema = new mongoose.Schema({
   inWaitingRoom: { type: Boolean, default: false },
   paidSessions: { type: Number, default: 0 },
   unpaidSessions: { type: Number, default: 0 },
-  consultationStatus: { type: String, enum: ['waiting', 'in_progress', 'finished', 'none'], default: 'none' }
+  consultationStatus: { type: String, enum: ['waiting', 'in_progress', 'finished', 'none'], default: 'none' },
+  lastVisitDate: { type: String },
+  lastSessionProcessedDate: { type: String }
 }, { timestamps: true });
 
 export default mongoose.models.Patient || mongoose.model('Patient', PatientSchema);

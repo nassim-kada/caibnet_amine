@@ -13,7 +13,7 @@ import { useApi as useLocalStorage } from '../hooks/useApi';
 import { defaultCategories } from '../data/mockData';
 import styles from './PatientDetail.module.css';
 
-type Tab = 'infos' | 'traitements' | 'seances' | 'paiements' | 'dossiers' | 'ordonnances';
+type Tab = 'infos' | 'traitements' | 'dossiers';
 
 export const PatientDetail = () => {
   const { id } = useParams();
@@ -23,15 +23,20 @@ export const PatientDetail = () => {
   const [injuries] = useLocalStorage<any[]>('app_injuries', []);
   const [categories] = useLocalStorage<any[]>('app_injury_categories', defaultCategories);
   const [doctors] = useLocalStorage<any[]>('app_doctors', []);
-  const [payments, , , fetchPayments] = useLocalStorage<any[]>('app_payments', []);
-  const [sessions, , , fetchSessions] = useLocalStorage<any[]>('app_sessions', []);
+  const [isAdmin, setIsAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const role = localStorage.getItem('app_user_role');
+      if (role === 'admin') {
+        setIsAdmin(true);
+      }
+    }
+  }, []);
   
   // Find patient
   const patient = patients.find((p: any) => p._id === id);
   const injury = patient ? injuries.find((i: any) => i._id === patient.injuryId) : null;
-  const patientPayments = patient ? payments.filter(p => p.patientId === patient._id) : [];
-  const patientSessions = patient ? sessions.filter(s => s.patientId === patient._id) : [];
-
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEditCategory, setSelectedEditCategory] = useState('');
@@ -49,8 +54,8 @@ export const PatientDetail = () => {
     const pInjury = injuries.find(i => i._id === patient.injuryId);
     setSelectedEditCategory(pInjury?.categoryId || '');
     setEditPatient({
-      firstName: patient.firstName,
-      lastName: patient.lastName,
+      firstName: patient.firstName || '',
+      lastName: patient.lastName || '',
       injuryId: patient.injuryId || '',
       doctor: patient.doctor || '',
       sessionsCompleted: patient.sessionsCompleted || 0,
@@ -83,47 +88,6 @@ export const PatientDetail = () => {
     setIsEditModalOpen(false);
   };
 
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('fr-DZ', { style: 'currency', currency: 'DZD' })
-      .format(amount)
-      .replace('DZD', 'DA');
-  };
-
-
-
-  const handleToggleSessionPayment = async (session: any) => {
-    const isCurrentlyPaid = session.paymentStatus === 'paid';
-    const newStatus = isCurrentlyPaid ? 'unpaid' : 'paid';
-    
-    // Determine session price
-    const sessionPrice = patient.totalAmount && patient.sessionsTotal 
-      ? Number(patient.totalAmount) / Number(patient.sessionsTotal)
-      : 1500; // Default price if not set
-
-    // Update session
-    await fetch(`/api/sessions/${session._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentStatus: newStatus })
-    });
-    fetchSessions();
-    
-    // Update patient paidAmount
-    const updatedPatient = {
-      ...patient,
-      paidAmount: isCurrentlyPaid 
-        ? Math.max(0, Number(patient.paidAmount || 0) - sessionPrice)
-        : Number(patient.paidAmount || 0) + sessionPrice
-    };
-    
-    await fetch(`/api/patients/${patient._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedPatient)
-    });
-    fetchPatients();
-  };
-
   const handleToggleTreatment = async (index: number) => {
     const completed = patient.completedTreatments || [];
     let newCompleted;
@@ -142,62 +106,53 @@ export const PatientDetail = () => {
     fetchPatients();
   };
 
-  const handleMarkSessionCompleted = async (sessionIndex: number) => {
-    const session = {
-      patientId: patient._id,
-      date: new Date().toISOString(),
-      notes: `Séance ${sessionIndex + 1} réalisée.`,
-      isCompleted: true,
-      paymentStatus: 'pending'
-    };
-    
-    await fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(session)
-    });
-    fetchSessions();
-    
-    const updatedPatient = {
-      ...patient,
-      sessionsCompleted: (patient.sessionsCompleted || 0) + 1
-    };
+  const handleInlineSessionSave = async (data: any) => {
+    const updatedPatient = { ...patient, ...data };
     
     await fetch(`/api/patients/${patient._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedPatient)
     });
+    
     fetchPatients();
   };
 
-  const handleCancelSession = async (sessionIndex: number) => {
-    const session = {
-      patientId: patient._id,
-      date: new Date().toISOString(),
-      notes: `Séance ${sessionIndex + 1} annulée (Absence/Autre).`,
-      isCompleted: false,
-      isCancelled: true
-    };
-    
-    await fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(session)
-    });
-    fetchSessions();
-    
-    const updatedPatient = {
-      ...patient,
-      sessionsCancelled: (patient.sessionsCancelled || 0) + 1
-    };
-    
-    await fetch(`/api/patients/${patient._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedPatient)
-    });
-    fetchPatients();
+  const InlineSessionEditorDetail = ({ patient, onSave }: { patient: any, onSave: (data: any) => void }) => {
+    const [paidSessions, setPaidSessions] = useState(patient.paidSessions || 0);
+    const [unpaidSessions, setUnpaidSessions] = useState(patient.unpaidSessions || 0);
+  
+    React.useEffect(() => {
+      setPaidSessions(patient.paidSessions || 0);
+      setUnpaidSessions(patient.unpaidSessions || 0);
+    }, [patient.paidSessions, patient.unpaidSessions]);
+  
+    const hasChanges = paidSessions !== (patient.paidSessions || 0) ||
+                       unpaidSessions !== (patient.unpaidSessions || 0);
+  
+    return (
+      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+        <div className={styles.infoRow} style={{ alignItems: 'center' }}>
+          <span className={styles.infoLabel}>Séances payées</span>
+          <span className={styles.infoValue}>
+            <input type="number" min="0" value={paidSessions} onChange={e => setPaidSessions(parseInt(e.target.value) || 0)} style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: '4px', textAlign: 'right' }} />
+          </span>
+        </div>
+        <div className={styles.infoRow} style={{ alignItems: 'center' }}>
+          <span className={styles.infoLabel}>Séances impayées</span>
+          <span className={styles.infoValue}>
+            <input type="number" min="0" value={unpaidSessions} onChange={e => setUnpaidSessions(parseInt(e.target.value) || 0)} style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: '4px', textAlign: 'right' }} />
+          </span>
+        </div>
+        {hasChanges && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <Button size="sm" onClick={() => onSave({ paidSessions, unpaidSessions })}>
+              Enregistrer les modifications
+            </Button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (!patient) {
@@ -215,8 +170,6 @@ export const PatientDetail = () => {
     );
   }
 
-  const remaining = Number(patient.totalAmount || 0) - Number(patient.paidAmount || 0);
-
   return (
     <div className={styles.container}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -230,7 +183,7 @@ export const PatientDetail = () => {
         <div className={styles.profile} style={{ flex: 1 }}>
           <div className={styles.avatar}>
             <span style={{ fontSize: '2rem', fontWeight: 600 }}>
-              {patient.firstName[0]}{patient.lastName[0]}
+              {patient.firstName ? patient.firstName[0] : ''}{patient.lastName ? patient.lastName[0] : ''}
             </span>
           </div>
           <div className={styles.info}>
@@ -241,17 +194,13 @@ export const PatientDetail = () => {
               </div>
               <span>•</span>
               <div className={styles.metaItem}>
-                <span>{patient.doctor}</span>
+                <span>{patient.doctor || 'Aucun médecin'}</span>
               </div>
-              <span>•</span>
-              <Badge variant={patient.status === 'Terminé' ? 'success' : 'warning'}>
-                {patient.status}
-              </Badge>
             </div>
           </div>
         </div>
         <Button variant="outline" leftIcon={<Edit2 size={18} />} onClick={openEditModal}>
-          Modifier
+          Modifier le dossier
         </Button>
       </div>
 
@@ -262,12 +211,6 @@ export const PatientDetail = () => {
         </button>
         <button className={`${styles.tab} ${activeTab === 'traitements' ? styles.active : ''}`} onClick={() => setActiveTab('traitements')}>
           Suivi Traitements
-        </button>
-        <button className={`${styles.tab} ${activeTab === 'seances' ? styles.active : ''}`} onClick={() => setActiveTab('seances')}>
-          Séances ({patientSessions.length}/{patient.sessionsTotal})
-        </button>
-        <button className={`${styles.tab} ${activeTab === 'paiements' ? styles.active : ''}`} onClick={() => setActiveTab('paiements')}>
-          Paiements
         </button>
         <button className={`${styles.tab} ${activeTab === 'dossiers' ? styles.active : ''}`} onClick={() => setActiveTab('dossiers')}>
           Dossiers médicaux
@@ -299,25 +242,37 @@ export const PatientDetail = () => {
             </div>
 
             <div className={styles.infoSection}>
-              <h3>Médical</h3>
+              <h3>Médical & Séances</h3>
               <div className={styles.infoRow}>
                 <span className={styles.infoLabel}>Médecin traitant</span>
-                <span className={styles.infoValue}>{patient.doctor}</span>
+                <span className={styles.infoValue}>{patient.doctor || '-'}</span>
               </div>
               <div className={styles.infoRow}>
                 <span className={styles.infoLabel}>Blessure / Motif</span>
-                <span className={styles.infoValue}>{injury?.name}</span>
+                <span className={styles.infoValue}>{injury?.name || '-'}</span>
               </div>
               <div className={styles.infoRow}>
                 <span className={styles.infoLabel}>Créé le</span>
-                <span className={styles.infoValue}>{new Date(patient.createdAt).toLocaleDateString('fr-FR')}</span>
+                <span className={styles.infoValue}>{new Date(patient.createdAt || Date.now()).toLocaleDateString('fr-FR')}</span>
               </div>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Statut</span>
-                <span className={styles.infoValue}>
-                  <Badge variant={patient.status === 'Terminé' ? 'success' : 'warning'}>{patient.status}</Badge>
-                </span>
-              </div>
+              {isAdmin ? (
+                <InlineSessionEditorDetail patient={patient} onSave={handleInlineSessionSave} />
+              ) : (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+                  <div className={styles.infoRow}>
+                    <span className={styles.infoLabel}>Séances payées</span>
+                    <span className={styles.infoValue}>{patient.paidSessions || 0}</span>
+                  </div>
+                  <div className={styles.infoRow}>
+                    <span className={styles.infoLabel}>Séances impayées</span>
+                    <span className={styles.infoValue}>
+                      <Badge variant={(patient.unpaidSessions || 0) > 0 ? 'danger' : 'success'}>
+                        {patient.unpaidSessions || 0}
+                      </Badge>
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -376,110 +331,6 @@ export const PatientDetail = () => {
           </div>
         )}
 
-        {activeTab === 'seances' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Historique des séances</h3>
-              <Button leftIcon={<CalendarIcon size={18} />}>Nouvelle séance</Button>
-            </div>
-            
-            <div className={styles.timeline}>
-              {Array.from({ length: patient.sessionsTotal }).map((_, idx) => {
-                const session = patientSessions[idx];
-                const isCompleted = session && session.isCompleted && !session.isCancelled;
-                const isCancelled = session && session.isCancelled;
-                const isNext = !session && (idx === 0 || !!patientSessions[idx - 1]);
-                
-                return (
-                  <div key={idx} className={styles.timelineItem}>
-                    <div className={`${styles.timelineIcon} ${isCompleted ? styles.completed : isCancelled ? styles.danger : ''}`} style={isCancelled ? { backgroundColor: 'var(--color-danger)', borderColor: 'var(--color-danger)' } : {}}>
-                      {isCompleted ? <Check size={20} /> : isCancelled ? <span style={{ color: 'white', fontWeight: 'bold' }}>X</span> : <span>{idx + 1}</span>}
-                    </div>
-                    <div className={styles.timelineContent} style={{ opacity: isCompleted || isNext || isCancelled ? 1 : 0.6 }}>
-                      <div className={styles.timelineHeader}>
-                        <span className={styles.timelineDate} style={{ color: isCancelled ? 'var(--color-danger)' : undefined }}>
-                          {isCompleted ? `Séance ${idx + 1} - Réalisée` : isCancelled ? `Séance ${idx + 1} - Annulée` : isNext ? `Séance ${idx + 1} - Prochaine` : `Séance ${idx + 1} - Prévue`}
-                        </span>
-                        {isNext && (
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <Button size="sm" onClick={() => handleMarkSessionCompleted(idx)}>Marquer réalisée</Button>
-                            <Button size="sm" variant="outline" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleCancelSession(idx)}>Annuler (Absence)</Button>
-                          </div>
-                        )}
-                        {(isCompleted || isCancelled) && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginTop: '0.5rem', display: 'block' }}>
-                            {new Date(session.date).toLocaleDateString('fr-FR')}
-                          </span>
-                        )}
-                      </div>
-                      <p className={styles.timelineNotes}>
-                        {isCompleted ? session.notes : isCancelled ? session.notes : 'En attente...'}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'paiements' && (
-          <div>
-            <div style={{ marginBottom: '2rem' }}>
-              <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
-                Vous pouvez modifier directement le nombre de séances ci-dessous. Les modifications sont enregistrées automatiquement.
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-                <Input 
-                  label="Séances effectuées" 
-                  type="number"
-                  min="0"
-                  value={patient.sessionsCompleted || 0}
-                  onChange={async (e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    await fetch(`/api/patients/${patient._id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ...patient, sessionsCompleted: val })
-                    });
-                    fetchPatients();
-                  }}
-                />
-                <Input 
-                  label="Séances payées" 
-                  type="number"
-                  min="0"
-                  value={patient.paidSessions || 0}
-                  onChange={async (e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    await fetch(`/api/patients/${patient._id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ...patient, paidSessions: val })
-                    });
-                    fetchPatients();
-                  }}
-                />
-                <Input 
-                  label="Séances impayées (Dette)" 
-                  type="number"
-                  min="0"
-                  value={patient.unpaidSessions || 0}
-                  onChange={async (e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    await fetch(`/api/patients/${patient._id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ...patient, unpaidSessions: val })
-                    });
-                    fetchPatients();
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'dossiers' && (
           <div>
             <div className={styles.uploadZone}>
@@ -493,7 +344,6 @@ export const PatientDetail = () => {
 
             <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Documents joints</h3>
             <div className={styles.gallery}>
-              {/* Mock documents */}
               <div className={styles.galleryItem}>
                 <FileIcon size={32} className={styles.docIcon} />
                 <span style={{ fontSize: '0.75rem', textAlign: 'center' }}>IRM_Rachis.pdf</span>
@@ -527,69 +377,68 @@ export const PatientDetail = () => {
             <Input label="Nom" required value={editPatient.lastName} onChange={e => setEditPatient({...editPatient, lastName: e.target.value})} style={{ flex: 1 }} />
             <Input label="Prénoms" required value={editPatient.firstName} onChange={e => setEditPatient({...editPatient, firstName: e.target.value})} style={{ flex: 1 }} />
           </div>
-          <Select 
-            label="Médecin orientateur (Optionnel)" 
-            options={[
-              { label: '-- Aucun ou à définir --', value: '' },
-              ...doctors.map(d => ({ label: d.name, value: d.name }))
-            ]}
-            value={editPatient.doctor} 
-            onChange={e => setEditPatient({...editPatient, doctor: e.target.value})}
-          />
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <Select 
-              label="Catégorie de blessure" 
-              options={[
-                { label: '-- Sélectionnez une catégorie --', value: '' },
-                ...categories.map(c => ({ label: c.name, value: c._id }))
-              ]}
-              value={selectedEditCategory}
-              onChange={e => {
-                setSelectedEditCategory(e.target.value);
-                setEditPatient({...editPatient, injuryId: ''});
-              }}
-              style={{ flex: 1 }}
-            />
-            {selectedEditCategory && (
+          {isAdmin && (
+            <>
               <Select 
-                label="Pathologie" 
+                label="Médecin orientateur (Optionnel)" 
                 options={[
-                  { label: '-- Sélectionnez une pathologie --', value: '' },
-                  ...injuries
-                    .filter(i => (i.categoryId || '') === selectedEditCategory)
-                    .map(i => ({ label: i.name, value: i._id }))
+                  { label: '-- Aucun ou à définir --', value: '' },
+                  ...doctors.map(d => ({ label: d.name, value: d.name }))
                 ]}
-                value={editPatient.injuryId}
-                onChange={e => setEditPatient({...editPatient, injuryId: e.target.value})}
-                style={{ flex: 1 }}
+                value={editPatient.doctor} 
+                onChange={e => setEditPatient({...editPatient, doctor: e.target.value})}
               />
-            )}
-          </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <Select 
+                  label="Catégorie de blessure" 
+                  options={[
+                    { label: '-- Sélectionnez une catégorie --', value: '' },
+                    ...categories.map(c => ({ label: c.name, value: c._id }))
+                  ]}
+                  value={selectedEditCategory}
+                  onChange={e => {
+                    setSelectedEditCategory(e.target.value);
+                    setEditPatient({...editPatient, injuryId: ''});
+                  }}
+                  style={{ flex: 1 }}
+                />
+                {selectedEditCategory && (
+                  <Select 
+                    label="Pathologie" 
+                    options={[
+                      { label: '-- Sélectionnez une pathologie --', value: '' },
+                      ...injuries
+                        .filter(i => (i.categoryId || '') === selectedEditCategory)
+                        .map(i => ({ label: i.name, value: i._id }))
+                    ]}
+                    value={editPatient.injuryId}
+                    onChange={e => setEditPatient({...editPatient, injuryId: e.target.value})}
+                    style={{ flex: 1 }}
+                  />
+                )}
+              </div>
+            </>
+          )}
 
-          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--color-primary)' }}>Gestion avancée des séances</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-
-              <Input 
-                label="Séances terminées" 
-                type="number" 
-                value={editPatient.sessionsCompleted} 
-                onChange={e => setEditPatient({...editPatient, sessionsCompleted: parseInt(e.target.value) || 0})} 
-              />
-              <Input 
-                label="Séances payées" 
-                type="number" 
-                value={editPatient.paidSessions} 
-                onChange={e => setEditPatient({...editPatient, paidSessions: parseInt(e.target.value) || 0})} 
-              />
-              <Input 
-                label="Séances NON payées (Dettes)" 
-                type="number" 
-                value={editPatient.unpaidSessions} 
-                onChange={e => setEditPatient({...editPatient, unpaidSessions: parseInt(e.target.value) || 0})} 
-              />
+          {isAdmin && (
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: 'var(--color-primary)' }}>Gestion avancée des séances</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <Input 
+                  label="Séances payées" 
+                  type="number" 
+                  value={editPatient.paidSessions} 
+                  onChange={e => setEditPatient({...editPatient, paidSessions: parseInt(e.target.value) || 0})} 
+                />
+                <Input 
+                  label="Séances NON payées (Dettes)" 
+                  type="number" 
+                  value={editPatient.unpaidSessions} 
+                  onChange={e => setEditPatient({...editPatient, unpaidSessions: parseInt(e.target.value) || 0})} 
+                />
+              </div>
             </div>
-          </div>
+          )}
         </form>
       </Modal>
     </div>

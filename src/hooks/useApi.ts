@@ -15,7 +15,7 @@ export function useApi<T>(endpoint: string, initialValue: T) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/${apiEndpoint}`);
+      const res = await fetch(`/api/${apiEndpoint}?_t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch');
       const result = await res.json();
       setData(result);
