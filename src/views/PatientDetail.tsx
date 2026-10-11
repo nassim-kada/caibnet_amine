@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Check, Calendar as CalendarIcon, UploadCloud, FileText, File as FileIcon, Image as ImageIcon, Edit2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
@@ -14,6 +14,43 @@ import { defaultCategories } from '../data/mockData';
 import styles from './PatientDetail.module.css';
 
 type Tab = 'infos' | 'traitements' | 'dossiers';
+
+const InlineSessionEditorDetail = ({ patient, onSave }: { patient: any, onSave: (data: any) => void }) => {
+  const [paidSessions, setPaidSessions] = useState(patient.paidSessions || 0);
+  const [unpaidSessions, setUnpaidSessions] = useState(patient.unpaidSessions || 0);
+
+  useEffect(() => {
+    setPaidSessions(patient.paidSessions || 0);
+    setUnpaidSessions(patient.unpaidSessions || 0);
+  }, [patient.paidSessions, patient.unpaidSessions]);
+
+  const hasChanges = paidSessions !== (patient.paidSessions || 0) ||
+                     unpaidSessions !== (patient.unpaidSessions || 0);
+
+  return (
+    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+      <div className={styles.infoRow} style={{ alignItems: 'center' }}>
+        <span className={styles.infoLabel}>Séances payées</span>
+        <span className={styles.infoValue}>
+          <input type="number" min="0" value={paidSessions} onChange={e => setPaidSessions(parseInt(e.target.value) || 0)} style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: '4px', textAlign: 'right' }} />
+        </span>
+      </div>
+      <div className={styles.infoRow} style={{ alignItems: 'center' }}>
+        <span className={styles.infoLabel}>Séances impayées</span>
+        <span className={styles.infoValue}>
+          <input type="number" min="0" value={unpaidSessions} onChange={e => setUnpaidSessions(parseInt(e.target.value) || 0)} style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: '4px', textAlign: 'right' }} />
+        </span>
+      </div>
+      {hasChanges && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+          <Button size="sm" onClick={() => onSave({ paidSessions, unpaidSessions })}>
+            Enregistrer les modifications
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const PatientDetail = () => {
   const { id } = useParams();
@@ -116,43 +153,6 @@ export const PatientDetail = () => {
     });
     
     fetchPatients();
-  };
-
-  const InlineSessionEditorDetail = ({ patient, onSave }: { patient: any, onSave: (data: any) => void }) => {
-    const [paidSessions, setPaidSessions] = useState(patient.paidSessions || 0);
-    const [unpaidSessions, setUnpaidSessions] = useState(patient.unpaidSessions || 0);
-  
-    React.useEffect(() => {
-      setPaidSessions(patient.paidSessions || 0);
-      setUnpaidSessions(patient.unpaidSessions || 0);
-    }, [patient.paidSessions, patient.unpaidSessions]);
-  
-    const hasChanges = paidSessions !== (patient.paidSessions || 0) ||
-                       unpaidSessions !== (patient.unpaidSessions || 0);
-  
-    return (
-      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-        <div className={styles.infoRow} style={{ alignItems: 'center' }}>
-          <span className={styles.infoLabel}>Séances payées</span>
-          <span className={styles.infoValue}>
-            <input type="number" min="0" value={paidSessions} onChange={e => setPaidSessions(parseInt(e.target.value) || 0)} style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: '4px', textAlign: 'right' }} />
-          </span>
-        </div>
-        <div className={styles.infoRow} style={{ alignItems: 'center' }}>
-          <span className={styles.infoLabel}>Séances impayées</span>
-          <span className={styles.infoValue}>
-            <input type="number" min="0" value={unpaidSessions} onChange={e => setUnpaidSessions(parseInt(e.target.value) || 0)} style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: '4px', textAlign: 'right' }} />
-          </span>
-        </div>
-        {hasChanges && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            <Button size="sm" onClick={() => onSave({ paidSessions, unpaidSessions })}>
-              Enregistrer les modifications
-            </Button>
-          </div>
-        )}
-      </div>
-    );
   };
 
   if (!patient) {

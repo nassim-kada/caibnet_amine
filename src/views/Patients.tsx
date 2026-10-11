@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, Plus, Eye, Edit2, Trash2, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Input } from '../components/ui/Input';
@@ -12,6 +12,99 @@ import { TableContainer, TableHead, TableBody, TableRow, TableHeader, TableCell 
 import { useApi as useLocalStorage } from '../hooks/useApi';
 import { defaultCategories } from '../data/mockData';
 import styles from './Patients.module.css';
+
+// Robust date formatting (YYYY-MM-DD)
+const getFormattedDate = (dateVal: any): string => {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateVal)) return dateVal;
+    const parts = dateVal.split(/[/.-]/);
+    if (parts.length === 3 && parts[0].length === 2 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const formatted = getFormattedDate(dateStr);
+  const parts = formatted.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+};
+
+const isPatientReceivedOnDate = (p: any, targetDate: string): boolean => {
+  if (!targetDate) return true;
+  const target = getFormattedDate(targetDate);
+  if (!target) return true;
+
+  if (p.lastVisitDate && getFormattedDate(p.lastVisitDate) === target) return true;
+  if (p.lastSessionProcessedDate && getFormattedDate(p.lastSessionProcessedDate) === target) return true;
+  if (Array.isArray(p.visitDates) && p.visitDates.some((vd: string) => getFormattedDate(vd) === target)) return true;
+
+  // createdAt n'est utilisé que pour les anciens dossiers sans historique de visites
+  // (sinon "Annuler" ne retirerait jamais un patient créé aujourd'hui de la liste du jour)
+  if (!Array.isArray(p.visitDates) && p.createdAt && getFormattedDate(p.createdAt) === target) return true;
+
+  return false;
+};
+
+// Date d'hier (YYYY-MM-DD, heure locale)
+const getYesterday = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return getFormattedDate(d);
+};
+
+// Recherche insensible aux accents et à la casse
+const normalize = (v: any): string =>
+  String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+// Heure d'arrivée du patient pour un jour donné (null si inconnue : anciens dossiers)
+const getArrivalTime = (p: any, day: string): number | null => {
+  const t = p.visitTimes?.[day];
+  const ms = t ? new Date(t).getTime() : NaN;
+  return isNaN(ms) ? null : ms;
+};
+
+const InlineSessionEditor = ({ patient, onSave }: { patient: any, onSave: (id: string, data: any) => void }) => {
+  const [paidSessions, setPaidSessions] = useState(patient.paidSessions || 0);
+  const [unpaidSessions, setUnpaidSessions] = useState(patient.unpaidSessions || 0);
+
+  useEffect(() => {
+    setPaidSessions(patient.paidSessions || 0);
+    setUnpaidSessions(patient.unpaidSessions || 0);
+  }, [patient.paidSessions, patient.unpaidSessions]);
+
+  const hasChanges = paidSessions !== (patient.paidSessions || 0) ||
+                     unpaidSessions !== (patient.unpaidSessions || 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+        <span style={{ color: 'var(--color-success)' }}>Payées</span>
+        <input type="number" min="0" value={paidSessions} onChange={e => setPaidSessions(parseInt(e.target.value) || 0)} style={{ width: '50px', padding: '2px 4px', border: '1px solid var(--color-border)', borderRadius: '4px' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+        <span style={{ color: 'var(--color-danger)' }}>Impayées</span>
+        <input type="number" min="0" value={unpaidSessions} onChange={e => setUnpaidSessions(parseInt(e.target.value) || 0)} style={{ width: '50px', padding: '2px 4px', border: '1px solid var(--color-border)', borderRadius: '4px' }} />
+      </div>
+      {hasChanges && (
+        <Button size="sm" onClick={() => onSave(patient._id, { paidSessions, unpaidSessions })} style={{ marginTop: '0.25rem', padding: '0.25rem', width: '100%', fontSize: '0.75rem' }}>
+          Enregistrer
+        </Button>
+      )}
+    </div>
+  );
+};
 
 export const Patients = () => {
   const router = useRouter();
@@ -54,43 +147,65 @@ export const Patients = () => {
     unpaidSessions: 0
   });
 
-  // Derived filters
-  const patientsWithIndex = (patients || [])
-    .sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateA - dateB;
-    })
-    .map((p, index) => ({ ...p, globalIndex: index + 1 }));
+  const today = getFormattedDate(new Date());
+  // Jour ciblé par la liste : filtre de date, sinon aujourd'hui dans l'onglet "jour"
+  const targetDay = dateFilter || (activeTab === 'jour' ? today : '');
 
-  const filteredPatients = patientsWithIndex.filter(p => {
-    const searchLower = searchTerm.toLowerCase();
-    const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
-    const phone = p.phone || '';
-    
-    const matchesSearch = 
-      fullName.includes(searchLower) || 
-      phone.includes(searchTerm) || 
-      p.globalIndex.toString() === searchTerm;
+  // N° permanent : tri stable (createdAt puis _id) sur une COPIE du tableau
+  // (l'ancien .sort() modifiait le state en place et le N° bougeait quand createdAt était identique/absent)
+  const patientsWithIndex = useMemo(() => {
+    return [...(patients || [])]
+      .sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() || 0 : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() || 0 : 0;
+        if (dateA !== dateB) return dateA - dateB;
+        return String(a._id ?? '').localeCompare(String(b._id ?? ''));
+      })
+      .map((p, index) => ({ ...p, globalIndex: index + 1 }));
+  }, [patients]);
 
-    let patientDate = '';
-    if (p.createdAt) {
-      patientDate = new Date(p.createdAt).toISOString().split('T')[0];
+  const filteredPatients = useMemo(() => {
+    const term = normalize(searchTerm.replace(/^#/, ''));
+    const rawTerm = searchTerm.trim().replace(/^#/, '');
+
+    const list = patientsWithIndex.filter(p => {
+      const matchesSearch =
+        !term ||
+        normalize(`${p.firstName} ${p.lastName}`).includes(term) ||
+        normalize(`${p.lastName} ${p.firstName}`).includes(term) ||
+        (p.phone || '').replace(/\s/g, '').includes(rawTerm.replace(/\s/g, '')) ||
+        p.globalIndex.toString() === rawTerm;
+
+      const matchesDate = dateFilter ? isPatientReceivedOnDate(p, dateFilter) : true;
+      const matchesTab = activeTab === 'jour' ? isPatientReceivedOnDate(p, targetDay) : true;
+
+      return matchesSearch && matchesDate && matchesTab;
+    });
+
+    // Vue d'une journée : ordre d'arrivée (1er reçu = N° 1). Les anciens dossiers sans heure
+    // d'arrivée passent en premier, dans l'ordre du dossier permanent.
+    if (targetDay) {
+      list.sort((a, b) => {
+        const ta = getArrivalTime(a, targetDay);
+        const tb = getArrivalTime(b, targetDay);
+        if (ta === null && tb === null) return a.globalIndex - b.globalIndex;
+        if (ta === null) return -1;
+        if (tb === null) return 1;
+        return ta - tb || a.globalIndex - b.globalIndex;
+      });
     }
-    const matchesDate = dateFilter ? patientDate === dateFilter : true;
-    
-    let matchesTab = true;
-    if (activeTab === 'jour') {
-      const today = new Date().toISOString().split('T')[0];
-      matchesTab = p.lastVisitDate === today;
-    }
+    return list;
+  }, [patientsWithIndex, searchTerm, dateFilter, activeTab, targetDay]);
 
-    return matchesSearch && matchesDate && matchesTab;
-  });
+  // Statistiques du jour ciblé (calculées APRÈS recherche/filtres)
+  const dayStats = useMemo(() => {
+    if (!targetDay) return null;
+    const treated = filteredPatients.filter(
+      p => p.lastSessionProcessedDate && getFormattedDate(p.lastSessionProcessedDate) === targetDay
+    ).length;
+    return { received: filteredPatients.length, treated, waiting: filteredPatients.length - treated };
+  }, [filteredPatients, targetDay]);
 
-
-
-  // ... (keep filteredPatients and handleDelete the same)
   const handleDelete = async () => {
     if (patientToDelete) {
       await fetch(`/api/patients/${patientToDelete}`, { method: 'DELETE' });
@@ -102,10 +217,13 @@ export const Patients = () => {
 
   const handleAddPatient = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nowIso = new Date().toISOString();
     const patient = {
       ...newPatient,
       gender: newPatient.gender as 'H' | 'F',
-      lastVisitDate: new Date().toISOString().split('T')[0],
+      lastVisitDate: today,
+      visitDates: [today],
+      visitTimes: { [today]: nowIso },
       consultationStatus: 'waiting'
     };
     
@@ -130,10 +248,17 @@ export const Patients = () => {
   const handleAddToToday = async (patientId: string) => {
     const patient = patients.find((p: any) => p._id === patientId);
     if (patient) {
-      const today = new Date().toISOString().split('T')[0];
       const { _id, ...patientData } = patient;
+      const existingDates: string[] = Array.isArray(patient.visitDates) ? patient.visitDates : [];
+      const newVisitDates = Array.from(new Set([...existingDates, today]));
       
-      const updatedPatient = { ...patientData, lastVisitDate: today, consultationStatus: 'waiting' };
+      const updatedPatient = { 
+        ...patientData, 
+        lastVisitDate: today, 
+        visitDates: newVisitDates,
+        visitTimes: { ...(patient.visitTimes || {}), [today]: new Date().toISOString() },
+        consultationStatus: 'waiting' 
+      };
 
       // Optimistic update
       updatePatients(patients.map((p: any) => p._id === patientId ? { ...p, _id: p._id, ...updatedPatient } : p));
@@ -151,14 +276,19 @@ export const Patients = () => {
   const handleProcessSession = async (patientId: string, isPaid: boolean) => {
     const patient = patients.find((p: any) => p._id === patientId);
     if (patient) {
-      const today = new Date().toISOString().split('T')[0];
       const { _id, ...patientData } = patient;
+      const existingDates: string[] = Array.isArray(patient.visitDates) ? patient.visitDates : [];
+      const newVisitDates = Array.from(new Set([...existingDates, today]));
+
       const updatedPatient = {
         ...patientData,
         sessionsCompleted: (patient.sessionsCompleted || 0) + 1,
         paidSessions: isPaid ? (patient.paidSessions || 0) + 1 : (patient.paidSessions || 0),
         unpaidSessions: !isPaid ? (patient.unpaidSessions || 0) + 1 : (patient.unpaidSessions || 0),
         lastVisitDate: today,
+        lastSessionProcessedDate: today,
+        visitDates: newVisitDates,
+        visitTimes: { ...(patient.visitTimes || {}), [today]: patient.visitTimes?.[today] || new Date().toISOString() },
         consultationStatus: 'finished'
       };
 
@@ -192,42 +322,20 @@ export const Patients = () => {
     }
   };
 
-  const InlineSessionEditor = ({ patient, onSave }: { patient: any, onSave: (id: string, data: any) => void }) => {
-    const [paidSessions, setPaidSessions] = useState(patient.paidSessions || 0);
-    const [unpaidSessions, setUnpaidSessions] = useState(patient.unpaidSessions || 0);
-  
-    useEffect(() => {
-      setPaidSessions(patient.paidSessions || 0);
-      setUnpaidSessions(patient.unpaidSessions || 0);
-    }, [patient.paidSessions, patient.unpaidSessions]);
-  
-    const hasChanges = paidSessions !== (patient.paidSessions || 0) ||
-                       unpaidSessions !== (patient.unpaidSessions || 0);
-  
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--color-success)' }}>Payées</span>
-          <input type="number" min="0" value={paidSessions} onChange={e => setPaidSessions(parseInt(e.target.value) || 0)} style={{ width: '50px', padding: '2px 4px', border: '1px solid var(--color-border)', borderRadius: '4px' }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--color-danger)' }}>Impayées</span>
-          <input type="number" min="0" value={unpaidSessions} onChange={e => setUnpaidSessions(parseInt(e.target.value) || 0)} style={{ width: '50px', padding: '2px 4px', border: '1px solid var(--color-border)', borderRadius: '4px' }} />
-        </div>
-        {hasChanges && (
-          <Button size="sm" onClick={() => onSave(patient._id, { paidSessions, unpaidSessions })} style={{ marginTop: '0.25rem', padding: '0.25rem', width: '100%', fontSize: '0.75rem' }}>
-            Enregistrer
-          </Button>
-        )}
-      </div>
-    );
-  };
-
   const handleRemoveFromToday = async (patientId: string) => {
     const patient = patients.find((p: any) => p._id === patientId);
     if (patient) {
       const { _id, ...patientData } = patient;
-      const updatedPatient = { ...patientData, lastVisitDate: '', consultationStatus: 'none' };
+      const remainingDates: string[] = (Array.isArray(patient.visitDates) ? patient.visitDates : [])
+        .filter((d: string) => getFormattedDate(d) !== today);
+      const { [today]: _removed, ...remainingTimes } = (patient.visitTimes || {}) as Record<string, string>;
+      const updatedPatient = {
+        ...patientData,
+        lastVisitDate: [...remainingDates].sort().pop() || '',
+        visitDates: remainingDates,
+        visitTimes: remainingTimes,
+        consultationStatus: 'none'
+      };
 
       updatePatients(patients.map((p: any) => p._id === patientId ? { ...p, _id: p._id, ...updatedPatient } : p));
 
@@ -258,7 +366,34 @@ export const Patients = () => {
               type="date"
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value)}
+              title="Filtrer par date"
             />
+            <button 
+              type="button" 
+              className={styles.quickDateBtn}
+              onClick={() => setDateFilter(getFormattedDate(new Date()))}
+              title="Filtrer par aujourd'hui"
+            >
+              Aujourd&apos;hui
+            </button>
+            <button 
+              type="button" 
+              className={styles.quickDateBtn}
+              onClick={() => setDateFilter(getYesterday())}
+              title="Filtrer par hier"
+            >
+              Hier
+            </button>
+            {dateFilter && (
+              <button 
+                type="button" 
+                className={styles.clearDateBtn}
+                onClick={() => setDateFilter('')}
+                title="Effacer le filtre de date"
+              >
+                ✕ Effacer
+              </button>
+            )}
           </div>
         </div>
         <Button leftIcon={<Plus size={18} />} onClick={() => setIsAddModalOpen(true)}>
@@ -266,7 +401,7 @@ export const Patients = () => {
         </Button>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
         <button 
           style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'tous' ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === 'tous' ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: activeTab === 'tous' ? 600 : 400, cursor: 'pointer', fontSize: '1rem' }}
           onClick={() => setActiveTab('tous')}
@@ -281,10 +416,70 @@ export const Patients = () => {
         </button>
       </div>
 
+      {/* Div compteur total selon le filtre */}
+      <div className={styles.totalPatientsCard} style={{ marginBottom: '1.5rem' }}>
+        <div className={styles.totalPatientsInfo}>
+          <div className={styles.totalPatientsBadge}>
+            <span className={styles.totalPatientsNumber}>{filteredPatients.length}</span>
+          </div>
+          <div className={styles.totalPatientsDetails}>
+            <h4 className={styles.totalPatientsTitle}>
+              {dateFilter ? (
+                <>Patients reçus le <span>{formatDisplayDate(dateFilter)}</span></>
+              ) : activeTab === 'jour' ? (
+                <>Patients reçus aujourd&apos;hui (<span>{formatDisplayDate(today)}</span>)</>
+              ) : searchTerm ? (
+                <>Patients trouvés pour &quot;<span>{searchTerm}</span>&quot;</>
+              ) : (
+                <>Total des patients enregistrés</>
+              )}
+            </h4>
+            <p className={styles.totalPatientsSubtitle}>
+              {filteredPatients.length === 0
+                ? 'Aucun patient ne correspond aux critères de filtre'
+                : `${filteredPatients.length} patient${filteredPatients.length > 1 ? 's' : ''} affiché${filteredPatients.length > 1 ? 's' : ''}`
+              }
+              {searchTerm && filteredPatients.length > 0 ? ` · recherche « ${searchTerm} »` : ''}
+            </p>
+          </div>
+        </div>
+
+        {dayStats && (
+          <div className={styles.dayStats}>
+            <div className={styles.dayStat}>
+              <span className={styles.dayStatValue}>{dayStats.received}</span>
+              <span className={styles.dayStatLabel}>Reçus</span>
+            </div>
+            <div className={styles.dayStat}>
+              <span className={styles.dayStatValue}>{dayStats.treated}</span>
+              <span className={styles.dayStatLabel}>Traités</span>
+            </div>
+            <div className={styles.dayStat}>
+              <span className={styles.dayStatValue}>{dayStats.waiting}</span>
+              <span className={styles.dayStatLabel}>En attente</span>
+            </div>
+          </div>
+        )}
+
+        {dateFilter && (
+          <div className={styles.filterChip}>
+            <span>Filtre appliqué : {formatDisplayDate(dateFilter)}</span>
+            <button 
+              type="button"
+              onClick={() => setDateFilter('')}
+              className={styles.filterChipClose}
+              title="Supprimer le filtre de date"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
       <TableContainer>
         <TableHead>
           <TableRow>
-            <TableHeader style={{ width: '50px' }}>N°</TableHeader>
+            <TableHeader style={{ width: '65px', textAlign: 'center' }}>N°</TableHeader>
             <TableHeader>Patient</TableHeader>
             <TableHeader>Médecin</TableHeader>
             <TableHeader>Blessure</TableHeader>
@@ -295,11 +490,21 @@ export const Patients = () => {
         <TableBody>
           {filteredPatients.length > 0 ? filteredPatients.map((patient, index) => {
             const injury = injuries.find((i: any) => i._id === patient.injuryId);
+            const rowNumber = index + 1;
             
             return (
               <TableRow key={patient._id}>
-                <TableCell>
-                  <strong>{activeTab === 'jour' ? index + 1 : patient.globalIndex}</strong>
+                <TableCell style={{ textAlign: 'center' }}>
+                  <div className={styles.rowNumberWrapper}>
+                    <span className={styles.rowNumberBadge}>
+                      {rowNumber}
+                    </span>
+                    {(dateFilter || searchTerm || activeTab === 'jour') && patient.globalIndex !== rowNumber && (
+                      <span className={styles.dossierRef} title={`Dossier permanent #${patient.globalIndex}`}>
+                        #{patient.globalIndex}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <strong>{patient.lastName} {patient.firstName}</strong>
@@ -325,7 +530,7 @@ export const Patients = () => {
                 <TableCell>
                   <div className={styles.actions} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     {activeTab === 'tous' ? (
-                      patient.lastVisitDate !== new Date().toISOString().split('T')[0] ? (
+                      !isPatientReceivedOnDate(patient, today) ? (
                         <Button 
                           size="sm" 
                           variant="outline" 
@@ -387,13 +592,17 @@ export const Patients = () => {
             );
           }) : (
             <TableRow>
-              <TableCell colSpan={7}>
+              <TableCell colSpan={6}>
                 <div className={styles.emptyState}>
                   <div className={styles.emptyStateIcon}>
                     <Users size={32} />
                   </div>
                   <h3 className={styles.emptyStateTitle}>Aucun patient trouvé</h3>
-                  <p className={styles.emptyStateText}>Aucun patient ne correspond à vos critères de recherche. Essayez de modifier vos filtres.</p>
+                  <p className={styles.emptyStateText}>
+                    {dateFilter 
+                      ? `Aucun patient n'a été reçu le ${formatDisplayDate(dateFilter)}.` 
+                      : 'Aucun patient ne correspond à vos critères de recherche. Essayez de modifier vos filtres.'}
+                  </p>
                 </div>
               </TableCell>
             </TableRow>
