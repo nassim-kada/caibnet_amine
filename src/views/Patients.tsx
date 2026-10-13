@@ -287,6 +287,7 @@ export const Patients = () => {
         unpaidSessions: !isPaid ? (patient.unpaidSessions || 0) + 1 : (patient.unpaidSessions || 0),
         lastVisitDate: today,
         lastSessionProcessedDate: today,
+        lastSessionPaid: isPaid,
         visitDates: newVisitDates,
         visitTimes: { ...(patient.visitTimes || {}), [today]: patient.visitTimes?.[today] || new Date().toISOString() },
         consultationStatus: 'finished'
@@ -670,7 +671,7 @@ export const Patients = () => {
             <Select 
               label="Catégorie de blessure" 
               options={[
-                { label: '-- Sélectionnez une catégorie --', value: '' },
+                { label: '-- Toutes / Sans catégorie --', value: '' },
                 ...categories.map(c => ({ label: c.name, value: c._id }))
               ]}
               value={selectedAddCategory}
@@ -680,20 +681,18 @@ export const Patients = () => {
               }}
               style={{ flex: 1 }}
             />
-            {selectedAddCategory && (
-              <Select 
-                label="Pathologie" 
-                options={[
-                  { label: '-- Sélectionnez une pathologie --', value: '' },
-                  ...injuries
-                    .filter(i => (i.categoryId || '') === selectedAddCategory)
-                    .map(i => ({ label: i.name, value: i._id }))
-                ]}
-                value={newPatient.injuryId}
-                onChange={e => setNewPatient({...newPatient, injuryId: e.target.value})}
-                style={{ flex: 1 }}
-              />
-            )}
+            <Select 
+              label="Pathologie / Blessure" 
+              options={[
+                { label: '-- Sélectionnez une pathologie --', value: '' },
+                ...injuries
+                  .filter(i => selectedAddCategory ? (i.categoryId || '') === selectedAddCategory : true)
+                  .map(i => ({ label: i.name, value: i._id }))
+              ]}
+              value={newPatient.injuryId}
+              onChange={e => setNewPatient({...newPatient, injuryId: e.target.value})}
+              style={{ flex: 1 }}
+            />
           </div>
         </form>
       </Modal>

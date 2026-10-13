@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, CheckCircle, Activity, TrendingUp, ArrowRight, AlertCircle } from 'lucide-react';
+import { Users, CheckCircle, Activity, TrendingUp, AlertCircle, Banknote, XCircle, CalendarCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { TableContainer, TableHead, TableBody, TableRow, TableHeader, TableCell } from '../components/ui/Table';
@@ -17,12 +17,64 @@ export const Dashboard = () => {
   const [injuries] = useLocalStorage<any[]>('app_injuries', []);
   const [categories] = useLocalStorage<any[]>('app_injury_categories', defaultCategories);
   
-  const todayPatients = useMemo(() => patients.filter((p: any) => p.createdAt && new Date(p.createdAt).toDateString() === new Date().toDateString()), [patients]);
-  
+  // Helpers de date
+  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const getFormattedDate = (dateVal: any): string => {
+    if (!dateVal) return '';
+    if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) return dateVal;
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  };
+
+  const todayPatients = useMemo(() => patients.filter((p: any) => {
+    if (Array.isArray(p.visitDates) && p.visitDates.some((vd: string) => getFormattedDate(vd) === todayStr)) return true;
+    if (p.lastVisitDate && getFormattedDate(p.lastVisitDate) === todayStr) return true;
+    if (!Array.isArray(p.visitDates) && p.createdAt && getFormattedDate(p.createdAt) === todayStr) return true;
+    return false;
+  }), [patients, todayStr]);
+
   const todayPatientsCount = todayPatients.length;
   const totalSessionsCompleted = patients.reduce((sum: number, p: any) => sum + (p.sessionsCompleted || 0), 0);
   const activePatientsCount = patients.filter((p: any) => p.status === 'En cours' || !p.status).length;
   const totalPatientsCount = patients.length;
+
+  // Stats payés / impayés du jour
+  const todayPaidCount = useMemo(() => todayPatients.filter((p: any) =>
+    p.lastSessionProcessedDate && getFormattedDate(p.lastSessionProcessedDate) === todayStr &&
+    (p.consultationStatus === 'finished') &&
+    (p.paidSessions || 0) > 0
+  ).length, [todayPatients, todayStr]);
+
+  const todayFinishedCount = useMemo(() => todayPatients.filter((p: any) =>
+    p.consultationStatus === 'finished'
+  ).length, [todayPatients]);
+
+  const todayPaidFinished = useMemo(() => todayPatients.filter((p: any) =>
+    p.consultationStatus === 'finished' &&
+    p.lastSessionProcessedDate && getFormattedDate(p.lastSessionProcessedDate) === todayStr &&
+    (p.unpaidSessions === undefined || p.unpaidSessions === 0 || 
+      (p.lastSessionPaid === true))
+  ).length, [todayPatients, todayStr]);
+
+  // Compter les patients du jour traités aujourd'hui avec payé / impayé
+  const todaySessionsPaid = useMemo(() => todayPatients.filter((p: any) =>
+    p.lastSessionProcessedDate && getFormattedDate(p.lastSessionProcessedDate) === todayStr &&
+    p.lastSessionPaid === true
+  ).length, [todayPatients, todayStr]);
+
+  const todaySessionsUnpaid = useMemo(() => todayPatients.filter((p: any) =>
+    p.lastSessionProcessedDate && getFormattedDate(p.lastSessionProcessedDate) === todayStr &&
+    p.lastSessionPaid === false
+  ).length, [todayPatients, todayStr]);
+
+  // Fallback : compter par consultationStatus si lastSessionPaid non dispo
+  const todayPaidDisplay = todaySessionsPaid > 0 || todaySessionsUnpaid > 0
+    ? todaySessionsPaid
+    : todayPatients.filter((p: any) => p.consultationStatus === 'finished' && (p.unpaidSessions === 0 || !p.unpaidSessions)).length;
+  const todayUnpaidDisplay = todaySessionsPaid > 0 || todaySessionsUnpaid > 0
+    ? todaySessionsUnpaid
+    : todayPatients.filter((p: any) => p.consultationStatus === 'finished' && (p.unpaidSessions || 0) > 0).length;
 
   const unpaidPatients = useMemo(() => {
     return patients
@@ -109,7 +161,7 @@ export const Dashboard = () => {
               <Users size={24} />
             </div>
             <div className={styles.statInfo}>
-              <span className={styles.statLabel}>Nouveaux patients (Jour)</span>
+              <span className={styles.statLabel}>Patients du jour</span>
               <span className={styles.statValue}>{todayPatientsCount}</span>
             </div>
           </div>
@@ -150,6 +202,43 @@ export const Dashboard = () => {
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* Bande récap paiements du jour */}
+      <div className={styles.todayPaymentBanner}>
+        <div className={styles.todayPaymentItem}>
+          <CalendarCheck size={20} className={styles.todayPaymentIcon} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <span className={styles.todayPaymentLabel}>Total patients du jour</span>
+            <span className={styles.todayPaymentValue}>{todayPatientsCount}</span>
+          </div>
+        </div>
+        <div className={styles.todayPaymentDivider} />
+        <div className={styles.todayPaymentItem}>
+          <Banknote size={20} className={styles.todayPaymentIcon} style={{ color: 'var(--color-success)' }} />
+          <div>
+            <span className={styles.todayPaymentLabel}>Payés aujourd'hui</span>
+            <span className={styles.todayPaymentValue} style={{ color: 'var(--color-success)' }}>{todayPaidDisplay}</span>
+          </div>
+        </div>
+        <div className={styles.todayPaymentDivider} />
+        <div className={styles.todayPaymentItem}>
+          <XCircle size={20} className={styles.todayPaymentIcon} style={{ color: 'var(--color-danger)' }} />
+          <div>
+            <span className={styles.todayPaymentLabel}>Non payés aujourd'hui</span>
+            <span className={styles.todayPaymentValue} style={{ color: 'var(--color-danger)' }}>{todayUnpaidDisplay}</span>
+          </div>
+        </div>
+        <div className={styles.todayPaymentDivider} />
+        <div className={styles.todayPaymentItem}>
+          <AlertCircle size={20} className={styles.todayPaymentIcon} style={{ color: 'var(--color-text-muted)' }} />
+          <div>
+            <span className={styles.todayPaymentLabel}>En attente</span>
+            <span className={styles.todayPaymentValue} style={{ color: 'var(--color-text-muted)' }}>
+              {todayPatientsCount - todayPaidDisplay - todayUnpaidDisplay < 0 ? 0 : todayPatientsCount - todayPaidDisplay - todayUnpaidDisplay}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className={styles.mainGrid}>
@@ -229,7 +318,7 @@ export const Dashboard = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    unpaidPatients.slice(0, 10).map((patient: any) => (
+                    unpaidPatients.map((patient: any) => (
                       <TableRow key={patient._id}>
                         <TableCell>
                           <strong>{patient.lastName} {patient.firstName}</strong>

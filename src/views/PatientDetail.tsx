@@ -392,7 +392,7 @@ export const PatientDetail = () => {
                 <Select 
                   label="Catégorie de blessure" 
                   options={[
-                    { label: '-- Sélectionnez une catégorie --', value: '' },
+                    { label: '-- Toutes / Sans catégorie --', value: '' },
                     ...categories.map(c => ({ label: c.name, value: c._id }))
                   ]}
                   value={selectedEditCategory}
@@ -402,20 +402,18 @@ export const PatientDetail = () => {
                   }}
                   style={{ flex: 1 }}
                 />
-                {selectedEditCategory && (
-                  <Select 
-                    label="Pathologie" 
-                    options={[
-                      { label: '-- Sélectionnez une pathologie --', value: '' },
-                      ...injuries
-                        .filter(i => (i.categoryId || '') === selectedEditCategory)
-                        .map(i => ({ label: i.name, value: i._id }))
-                    ]}
-                    value={editPatient.injuryId}
-                    onChange={e => setEditPatient({...editPatient, injuryId: e.target.value})}
-                    style={{ flex: 1 }}
-                  />
-                )}
+                <Select 
+                  label="Pathologie / Blessure" 
+                  options={[
+                    { label: '-- Sélectionnez une pathologie --', value: '' },
+                    ...injuries
+                      .filter(i => selectedEditCategory ? (i.categoryId || '') === selectedEditCategory : true)
+                      .map(i => ({ label: i.name, value: i._id }))
+                  ]}
+                  value={editPatient.injuryId}
+                  onChange={e => setEditPatient({...editPatient, injuryId: e.target.value})}
+                  style={{ flex: 1 }}
+                />
               </div>
             </>
           )}

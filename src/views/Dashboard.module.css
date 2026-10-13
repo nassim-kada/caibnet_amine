@@ -222,3 +222,64 @@
   height: 12px;
   border-radius: 3px;
 }
+
+/* ── Bande récap paiements du jour ── */
+.todayPaymentBanner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.todayPaymentItem {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  flex: 1;
+  min-width: 160px;
+}
+
+.todayPaymentIcon {
+  flex-shrink: 0;
+}
+
+.todayPaymentItem > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.todayPaymentLabel {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.todayPaymentValue {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.todayPaymentDivider {
+  width: 1px;
+  height: 3rem;
+  background: var(--color-border);
+  margin: 0 1.5rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .todayPaymentBanner {
+    gap: 1rem;
+  }
+  .todayPaymentDivider {
+    display: none;
+  }
+}
