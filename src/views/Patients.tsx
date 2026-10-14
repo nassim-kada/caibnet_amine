@@ -68,12 +68,19 @@ const getYesterday = (): string => {
 const normalize = (v: any): string =>
   String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-// Heure d'arrivée du patient pour un jour donné (null si inconnue : anciens dossiers)
+// Heure d'arrivée du patient pour un jour donné (null si inconnue : anciens dossiers).
+// Repli sur createdAt uniquement si le dossier a été créé ce jour-là.
 const getArrivalTime = (p: any, day: string): number | null => {
   const t = p.visitTimes?.[day];
-  const ms = t ? new Date(t).getTime() : NaN;
+  let ms = t ? new Date(t).getTime() : NaN;
+  if (isNaN(ms) && p.createdAt && getFormattedDate(p.createdAt) === day) {
+    ms = new Date(p.createdAt).getTime();
+  }
   return isNaN(ms) ? null : ms;
 };
+
+const formatArrival = (ms: number | null): string =>
+  ms === null ? '--:--' : new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 const InlineSessionEditor = ({ patient, onSave }: { patient: any, onSave: (id: string, data: any) => void }) => {
   const [paidSessions, setPaidSessions] = useState(patient.paidSessions || 0);
@@ -173,6 +180,7 @@ export const Patients = () => {
         !term ||
         normalize(`${p.firstName} ${p.lastName}`).includes(term) ||
         normalize(`${p.lastName} ${p.firstName}`).includes(term) ||
+        normalize(p.doctor).includes(term) ||
         (p.phone || '').replace(/\s/g, '').includes(rawTerm.replace(/\s/g, '')) ||
         p.globalIndex.toString() === rawTerm;
 
@@ -355,7 +363,7 @@ export const Patients = () => {
         <div className={styles.filters}>
           <div className={styles.searchBar}>
             <Input 
-              placeholder="Rechercher par nom, téléphone ou N°..." 
+              placeholder="Rechercher par nom, médecin, téléphone ou N°..." 
               leftIcon={<Search size={18} />}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -402,17 +410,19 @@ export const Patients = () => {
         </Button>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
+      <div className={styles.tabBar}>
         <button 
-          style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'tous' ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === 'tous' ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: activeTab === 'tous' ? 600 : 400, cursor: 'pointer', fontSize: '1rem' }}
+          className={`${styles.tabBtn} ${activeTab === 'tous' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('tous')}
         >
+          <Users size={16} />
           Tous les patients
         </button>
         <button 
-          style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'jour' ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === 'jour' ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: activeTab === 'jour' ? 600 : 400, cursor: 'pointer', fontSize: '1rem' }}
+          className={`${styles.tabBtn} ${activeTab === 'jour' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('jour')}
         >
+          <Filter size={16} />
           Patients du jour
         </button>
       </div>
@@ -482,6 +492,7 @@ export const Patients = () => {
           <TableRow>
             <TableHeader style={{ width: '65px', textAlign: 'center' }}>N°</TableHeader>
             <TableHeader>Patient</TableHeader>
+            {targetDay && <TableHeader style={{ width: '80px' }}>Heure</TableHeader>}
             <TableHeader>Médecin</TableHeader>
             <TableHeader>Blessure</TableHeader>
             <TableHeader>Séances & Paiements</TableHeader>
@@ -510,6 +521,11 @@ export const Patients = () => {
                 <TableCell>
                   <strong>{patient.lastName} {patient.firstName}</strong>
                 </TableCell>
+                {targetDay && (
+                  <TableCell>
+                    <span className={styles.arrivalTime}>{formatArrival(getArrivalTime(patient, targetDay))}</span>
+                  </TableCell>
+                )}
                 <TableCell>{patient.doctor || '-'}</TableCell>
                 <TableCell>{injury?.name || '-'}</TableCell>
                 <TableCell>
@@ -593,7 +609,7 @@ export const Patients = () => {
             );
           }) : (
             <TableRow>
-              <TableCell colSpan={6}>
+              <TableCell colSpan={targetDay ? 7 : 6}>
                 <div className={styles.emptyState}>
                   <div className={styles.emptyStateIcon}>
                     <Users size={32} />

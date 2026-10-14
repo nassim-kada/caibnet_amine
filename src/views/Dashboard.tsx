@@ -18,20 +18,42 @@ export const Dashboard = () => {
   const [categories] = useLocalStorage<any[]>('app_injury_categories', defaultCategories);
   
   // Helpers de date
-  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  // Date locale (YYYY-MM-DD), identique à Patients.tsx (et non plus en UTC)
   const getFormattedDate = (dateVal: any): string => {
     if (!dateVal) return '';
     if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) return dateVal;
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
+  const todayStr = getFormattedDate(new Date());
 
+  // Heure d'arrivée du jour (repli sur createdAt seulement si le dossier a été créé ce jour-là)
+  const getArrivalMs = (p: any, day: string): number | null => {
+    const t = p.visitTimes?.[day];
+    let ms = t ? new Date(t).getTime() : NaN;
+    if (isNaN(ms) && p.createdAt && getFormattedDate(p.createdAt) === day) {
+      ms = new Date(p.createdAt).getTime();
+    }
+    return isNaN(ms) ? null : ms;
+  };
+  const formatTime = (ms: number | null): string =>
+    ms === null ? '--:--' : new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  // Patients du jour, triés par heure d'arrivée (1er arrivé en premier).
+  // Heure inconnue (anciens dossiers) : en premier, comme dans Patients.tsx.
   const todayPatients = useMemo(() => patients.filter((p: any) => {
     if (Array.isArray(p.visitDates) && p.visitDates.some((vd: string) => getFormattedDate(vd) === todayStr)) return true;
     if (p.lastVisitDate && getFormattedDate(p.lastVisitDate) === todayStr) return true;
     if (!Array.isArray(p.visitDates) && p.createdAt && getFormattedDate(p.createdAt) === todayStr) return true;
     return false;
+  }).sort((a: any, b: any) => {
+    const ta = getArrivalMs(a, todayStr);
+    const tb = getArrivalMs(b, todayStr);
+    if (ta === null && tb === null) return 0;
+    if (ta === null) return -1;
+    if (tb === null) return 1;
+    return ta - tb;
   }), [patients, todayStr]);
 
   const todayPatientsCount = todayPatients.length;
@@ -267,7 +289,7 @@ export const Dashboard = () => {
                     </TableRow>
                   ) : (
                     todayPatients.map((patient: any) => {
-                      const time = patient.createdAt ? new Date(patient.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '-';
+                      const time = formatTime(getArrivalMs(patient, todayStr));
                       
                       return (
                         <TableRow key={patient._id}>

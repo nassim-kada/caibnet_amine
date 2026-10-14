@@ -1,177 +1,172 @@
+/* ── Dashboard ── */
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.75rem;
 }
 
+/* ── Stats Grid ── */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
 }
 
 .statCard {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  padding: 1.5rem;
+  gap: 1.125rem;
+  padding: 1.375rem 1.5rem;
 }
 
 .statIcon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform var(--transition-bounce);
+}
+
+.card:hover .statIcon {
+  transform: scale(1.08);
 }
 
 .statIcon.primary {
-  background-color: rgba(11, 42, 91, 0.1);
+  background: linear-gradient(135deg, rgba(11, 42, 91, 0.12) 0%, rgba(11, 42, 91, 0.06) 100%);
   color: var(--color-primary);
 }
 
 .statIcon.accent {
-  background-color: rgba(19, 124, 139, 0.1);
+  background: linear-gradient(135deg, rgba(19, 124, 139, 0.15) 0%, rgba(19, 124, 139, 0.07) 100%);
   color: var(--color-accent);
 }
 
 .statIcon.success {
-  background-color: var(--color-success-bg);
+  background: linear-gradient(135deg, rgba(30, 155, 106, 0.15) 0%, rgba(30, 155, 106, 0.07) 100%);
   color: var(--color-success);
 }
 
 .statIcon.secondary {
-  background-color: rgba(227, 179, 65, 0.15);
-  color: var(--color-secondary);
+  background: linear-gradient(135deg, rgba(227, 179, 65, 0.18) 0%, rgba(227, 179, 65, 0.08) 100%);
+  color: var(--color-secondary-dark);
 }
 
 .statInfo {
   display: flex;
   flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
 }
 
 .statLabel {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: var(--color-text-muted);
-  margin-bottom: 0.25rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .statValue {
   font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.875rem;
+  font-weight: 800;
   color: var(--color-primary);
+  line-height: 1;
 }
 
-.mainGrid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 1.5rem;
-}
-
-@media (max-width: 1024px) {
-  .mainGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.chartPlaceholder {
-  width: 100%;
-  height: 250px;
-  background-color: var(--color-bg);
-  border-radius: var(--radius-sm);
+/* ── Today Payment Banner ── */
+.todayPaymentBanner {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  border: 1px dashed var(--color-border);
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
 }
 
-/* Quick implementation of a pure CSS bar chart */
-.barChart {
+.todayPaymentBanner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 50%, var(--color-secondary) 100%);
+}
+
+.todayPaymentItem {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  height: 220px;
-  width: 100%;
-  padding-top: 20px;
-  gap: 10px;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  min-width: 0;
+  position: relative;
+  transition: background var(--transition-fast);
 }
 
-.barCol {
+.todayPaymentItem:hover {
+  background: rgba(0,0,0,0.02);
+}
+
+.todayPaymentIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.todayPaymentItem > div {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
-.bar {
-  width: 100%;
-  max-width: 40px;
-  background-color: var(--color-accent);
-  border-radius: 4px 4px 0 0;
-  transition: height 1s ease-out, background-color 0.2s;
-  min-height: 4px;
-}
-
-.bar:hover {
-  background-color: var(--color-primary);
-}
-
-.barLabel {
-  font-size: 0.75rem;
+.todayPaymentLabel {
+  font-size: 0.775rem;
   color: var(--color-text-muted);
-}
-
-.paymentTotal {
-  font-family: var(--font-heading);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-success);
-  margin-bottom: 0.25rem;
-}
-
-.paymentSubtitle {
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
-
-.paymentRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.paymentRow:last-child {
-  border-bottom: none;
-}
-
-.paymentLabel {
   font-weight: 500;
-  color: var(--color-text-main);
+  white-space: nowrap;
 }
 
-.paymentValue {
-  font-weight: 600;
+.todayPaymentValue {
+  font-family: var(--font-heading);
+  font-size: 1.875rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1;
 }
 
-.paymentValue.danger {
-  color: var(--color-danger);
+.todayPaymentDivider {
+  width: 1px;
+  height: 3.5rem;
+  background: var(--color-border);
+  flex-shrink: 0;
 }
 
-/* Donut chart simulation */
+/* ── Main Grid ── */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 3fr 1.4fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* ── Donut Chart ── */
 .donutChartContainer {
   position: relative;
-  width: 180px;
-  height: 180px;
+  width: 160px;
+  height: 160px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.08));
 }
 
 .donutSvg {
@@ -183,103 +178,131 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 0.125rem;
 }
 
 .donutTotal {
   font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 800;
   color: var(--color-primary);
 }
 
 .donutLabel {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--color-text-muted);
+  font-weight: 500;
+  text-align: center;
 }
 
 .legend {
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.625rem;
 }
 
 .legendItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  padding: 0.3rem 0;
+  transition: opacity var(--transition-fast);
+}
+
+.legendItem:hover {
+  opacity: 0.8;
 }
 
 .legendLeft {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.legendLeft span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .legendColor {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 3px;
-}
-
-/* ── Bande récap paiements du jour ── */
-.todayPaymentBanner {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1.25rem 1.5rem;
-  flex-wrap: wrap;
-}
-
-.todayPaymentItem {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  flex: 1;
-  min-width: 160px;
-}
-
-.todayPaymentIcon {
   flex-shrink: 0;
 }
 
-.todayPaymentItem > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+/* ── Responsive ── */
+@media (max-width: 1280px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-.todayPaymentLabel {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.todayPaymentValue {
-  font-family: var(--font-heading);
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--color-primary);
-  line-height: 1;
-}
-
-.todayPaymentDivider {
-  width: 1px;
-  height: 3rem;
-  background: var(--color-border);
-  margin: 0 1.5rem;
-  flex-shrink: 0;
+@media (max-width: 1024px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .todayPaymentBanner {
-    gap: 1rem;
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.875rem;
   }
+
+  .statCard {
+    padding: 1rem 1.125rem;
+  }
+
+  .statValue {
+    font-size: 1.5rem;
+  }
+
+  .todayPaymentBanner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .todayPaymentItem {
+    padding: 1rem 1.25rem;
+  }
+
   .todayPaymentDivider {
-    display: none;
+    width: 100%;
+    height: 1px;
+  }
+
+  .todayPaymentValue {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .statCard {
+    padding: 0.875rem 1rem;
+    gap: 0.75rem;
+  }
+
+  .statIcon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .statValue {
+    font-size: 1.375rem;
+  }
+
+  .statLabel {
+    font-size: 0.72rem;
   }
 }

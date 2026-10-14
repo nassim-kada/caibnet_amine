@@ -4,6 +4,8 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
@@ -11,25 +13,38 @@
   border-collapse: collapse;
   text-align: left;
   font-size: 0.875rem;
+  min-width: 500px; /* Prevents extreme squishing */
 }
 
 .th {
-  padding: 1rem 1.25rem;
-  font-weight: 600;
+  padding: 0.875rem 1.125rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--color-text-muted);
-  background-color: var(--color-surface-hover);
+  background-color: var(--color-surface-2);
   border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
+  user-select: none;
+}
+
+.th:first-child {
+  border-radius: var(--radius-md) 0 0 0;
+}
+
+.th:last-child {
+  border-radius: 0 var(--radius-md) 0 0;
 }
 
 .td {
-  padding: 1rem 1.25rem;
+  padding: 0.875rem 1.125rem;
   color: var(--color-text-main);
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
+  line-height: 1.5;
 }
 
-/* For tabular figures (aligning numbers well) */
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -43,5 +58,16 @@
 }
 
 .tr:hover {
-  background-color: rgba(244, 248, 250, 0.5); /* subtle hover */
+  background-color: var(--color-surface-2);
+}
+
+/* ── Responsive mobile card layout ── */
+@media (max-width: 640px) {
+  .tableContainer {
+    border-radius: var(--radius-sm);
+  }
+
+  .table {
+    min-width: auto;
+  }
 }

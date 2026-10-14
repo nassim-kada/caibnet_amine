@@ -4,45 +4,53 @@
   gap: 1.5rem;
 }
 
+/* ── Profile Header ── */
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding: 1.5rem;
-  background-color: var(--color-surface);
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
 }
 
 .profile {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .avatar {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background-color: var(--color-bg);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-primary);
-  border: 2px solid var(--color-border);
+  color: #FFFFFF;
+  border: 3px solid var(--color-surface);
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
 }
 
 .info h2 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
+  margin: 0 0 0.375rem 0;
+  font-size: 1.375rem;
+  font-weight: 800;
 }
 
 .meta {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   color: var(--color-text-muted);
   font-size: 0.875rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .metaItem {
@@ -51,29 +59,35 @@
   gap: 0.375rem;
 }
 
+/* ── Tabs ── */
 .tabs {
   display: flex;
-  gap: 1rem;
-  border-bottom: 1px solid var(--color-border);
+  gap: 0;
+  border-bottom: 2px solid var(--color-border);
   overflow-x: auto;
+  scrollbar-width: none;
 }
 
+.tabs::-webkit-scrollbar { display: none; }
+
 .tab {
-  padding: 1rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   background: transparent;
   border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
   font-family: var(--font-heading);
   font-weight: 600;
   font-size: 0.9375rem;
   color: var(--color-text-muted);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
   transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
 .tab:hover {
   color: var(--color-primary);
+  background: rgba(11, 42, 91, 0.03);
 }
 
 .tab.active {
@@ -81,6 +95,7 @@
   border-bottom-color: var(--color-accent);
 }
 
+/* ── Content ── */
 .content {
   background-color: var(--color-surface);
   border-radius: var(--radius-md);
@@ -90,25 +105,32 @@
   min-height: 400px;
 }
 
-/* Info Tab */
+/* ── Info Grid ── */
 .infoGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2rem;
 }
 
 .infoSection h3 {
-  font-size: 1.125rem;
+  font-size: 1rem;
+  font-weight: 700;
   margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.625rem;
+  border-bottom: 2px solid var(--color-border);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .infoRow {
   display: flex;
   justify-content: space-between;
-  padding: 0.75rem 0;
-  border-bottom: 1px dashed var(--color-border);
+  align-items: center;
+  padding: 0.6875rem 0;
+  border-bottom: 1px solid var(--color-border);
+  gap: 1rem;
 }
 
 .infoRow:last-child {
@@ -118,15 +140,18 @@
 .infoLabel {
   color: var(--color-text-muted);
   font-weight: 500;
+  font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
 .infoValue {
   font-weight: 600;
   color: var(--color-text-main);
   text-align: right;
+  font-size: 0.9rem;
 }
 
-/* Sessions Tab */
+/* ── Timeline ── */
 .timeline {
   display: flex;
   flex-direction: column;
@@ -137,23 +162,23 @@
 .timeline::before {
   content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 20px;
+  bottom: 20px;
   left: 20px;
   width: 2px;
-  background-color: var(--color-border);
+  background: linear-gradient(180deg, var(--color-border) 0%, transparent 100%);
 }
 
 .timelineItem {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
   position: relative;
   z-index: 1;
 }
 
 .timelineIcon {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background-color: var(--color-surface);
   border: 2px solid var(--color-border);
@@ -162,6 +187,7 @@
   justify-content: center;
   flex-shrink: 0;
   color: var(--color-text-muted);
+  box-shadow: var(--shadow-xs);
 }
 
 .timelineIcon.completed {
@@ -172,8 +198,8 @@
 
 .timelineContent {
   flex: 1;
-  background-color: var(--color-bg);
-  padding: 1rem;
+  background-color: var(--color-surface-2);
+  padding: 0.875rem 1.125rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
 }
@@ -182,12 +208,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.375rem;
 }
 
 .timelineDate {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-primary);
+  font-size: 0.875rem;
 }
 
 .timelineNotes {
@@ -195,46 +222,50 @@
   color: var(--color-text-main);
 }
 
-/* Upload zone */
+/* ── Upload zone ── */
 .uploadZone {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-md);
-  padding: 3rem 2rem;
+  padding: 2.5rem 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: 1rem;
-  background-color: var(--color-bg);
-  transition: all var(--transition-fast);
+  background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-surface-2) 100%);
+  transition: all var(--transition-normal);
   cursor: pointer;
 }
 
 .uploadZone:hover {
   border-color: var(--color-accent);
-  background-color: rgba(19, 124, 139, 0.05);
+  background: rgba(19, 124, 139, 0.04);
+  transform: scale(1.005);
 }
 
 .uploadIcon {
   color: var(--color-accent);
+  opacity: 0.8;
 }
 
 .uploadText {
   color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
 
+/* ── Gallery ── */
 .gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 1rem;
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
 }
 
 .galleryItem {
   aspect-ratio: 1;
   border-radius: var(--radius-sm);
-  background-color: var(--color-bg);
+  background-color: var(--color-surface-2);
   border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -242,8 +273,58 @@
   justify-content: center;
   gap: 0.5rem;
   color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0.75rem;
+}
+
+.galleryItem:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .docIcon {
-  color: var(--color-danger); /* Red for PDF */
+  color: var(--color-danger);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .header {
+    padding: 1.125rem;
+  }
+
+  .avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .info h2 {
+    font-size: 1.125rem;
+  }
+
+  .tab {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .content {
+    padding: 1.125rem;
+  }
+
+  .infoGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gallery {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
 }

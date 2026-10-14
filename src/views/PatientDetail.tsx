@@ -105,7 +105,6 @@ export const PatientDetail = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const updatedPatient = {
-      ...patient,
       firstName: editPatient.firstName,
       lastName: editPatient.lastName,
       injuryId: editPatient.injuryId,
@@ -133,7 +132,7 @@ export const PatientDetail = () => {
     } else {
       newCompleted = [...completed, index];
     }
-    const updatedPatient = { ...patient, completedTreatments: newCompleted };
+    const updatedPatient = { completedTreatments: newCompleted };
     
     await fetch(`/api/patients/${patient._id}`, {
       method: 'PUT',
@@ -144,7 +143,7 @@ export const PatientDetail = () => {
   };
 
   const handleInlineSessionSave = async (data: any) => {
-    const updatedPatient = { ...patient, ...data };
+    const updatedPatient = { ...data };
     
     await fetch(`/api/patients/${patient._id}`, {
       method: 'PUT',

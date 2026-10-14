@@ -22,7 +22,9 @@ const PatientSchema = new mongoose.Schema({
   consultationStatus: { type: String, enum: ['waiting', 'in_progress', 'finished', 'none'], default: 'none' },
   lastVisitDate: { type: String },
   lastSessionProcessedDate: { type: String },
-  visitDates: { type: [String], default: [] }
+  visitDates: { type: [String], default: [] },
+  visitTimes: { type: mongoose.Schema.Types.Mixed, default: {} }, // { "YYYY-MM-DD": ISO date d'arrivée }
+  lastSessionPaid: { type: Boolean }
 }, { timestamps: true });
 
 export default mongoose.models.Patient || mongoose.model('Patient', PatientSchema);
